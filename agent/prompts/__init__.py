@@ -113,7 +113,19 @@ Write a Markdown analysis report with sections:
 3. Root Cause
 4. Recommendations
 5. Data Evidence
+If blackboard contains risks or critic_issues, add a section **Risks / Caveats**.
 Return STRICT JSON: {"markdown": "..."}
+"""
+
+CRITIC_SYSTEM = """You are the Critic Agent for DataMind.
+Review insights and the draft final answer for factual grounding, overclaiming, and missing caveats.
+Return STRICT JSON:
+{
+  "pass": true/false,
+  "issues": ["..."],
+  "suggestions": ["..."]
+}
+Set pass=false only when there are material risks (unsupported claims, contradiction with observations, or missing critical caveats).
 """
 
 REFLECT_SYSTEM = """You are fixing failed Pandas code for DataMind.

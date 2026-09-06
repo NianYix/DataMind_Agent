@@ -62,7 +62,7 @@ async def lifespan(_app: FastAPI):
         pass
 
 
-app = FastAPI(title="DataMind Agent API", version="0.7.0", lifespan=lifespan)
+app = FastAPI(title="DataMind Agent API", version="0.8.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -87,7 +87,9 @@ def health():
     return {
         "status": "ok",
         "app": "DataMind Agent",
-        "version": "0.7.0",
+        "version": "0.8.0",
         "auth_enabled": cfg.auth_enabled,
         "mcp_enabled": cfg.mcp_enabled,
+        "multi_agent_enabled": cfg.multi_agent_enabled,
+        "critic_enabled": cfg.critic_enabled,
     }

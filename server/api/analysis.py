@@ -68,6 +68,11 @@ def get_trace(run_id: str, db: Session = Depends(get_db)):
     return chat_service.get_trace(db, run_id)
 
 
+@router.get("/agent-runs/{run_id}/collaboration")
+def get_collaboration(run_id: str, db: Session = Depends(get_db)):
+    return chat_service.get_collaboration(db, run_id)
+
+
 @router.get("/agent-runs/{run_id}/report", response_model=ReportOut)
 def get_report(run_id: str, db: Session = Depends(get_db)):
     return chat_service.get_report_for_run(db, run_id)

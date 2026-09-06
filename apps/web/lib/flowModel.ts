@@ -42,12 +42,23 @@ function kindOf(type: string): FlowKind {
   if (/(tool|execute|sql|python|statistics|anomaly|http|search)/.test(t)) return "action";
   if (/(observe|observation|data|profile)/.test(t)) return "data";
   if (/(plan|understand)/.test(t)) return "logic";
-  if (/(insight|report|final|supervisor|agent|llm)/.test(t)) return "ai";
+  if (/(insight|report|final|supervisor|agent|llm|critic|planner|understand)/.test(t)) return "ai";
   return "logic";
 }
 
 function titleOf(type: string): string {
   if (!type) return "Step";
+  const map: Record<string, string> = {
+    critic: "Critic",
+    insight: "Insight",
+    supervisor: "Supervisor",
+    planner: "Planner",
+    understand: "Understand",
+    report: "Report",
+    Analyst: "Analyst",
+    Tools: "Tools",
+  };
+  if (map[type]) return map[type];
   return type.replace(/_/g, " ");
 }
 

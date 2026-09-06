@@ -62,6 +62,11 @@ class LangGraphAgentRuntime:
             "used_non_python_tool": False,
             "status": "running",
             "started_at": time.time(),
+            "handoffs": [],
+            "blackboard": {},
+            "agents_involved": [],
+            "last_agent": None,
+            "critic_result": None,
         }
 
         config = {
@@ -138,10 +143,13 @@ class LangGraphAgentRuntime:
         run.latency_ms = int((time.perf_counter() - started) * 1000)
         run.error = error
         run.model = self.settings.llm_model
+        from agent.lc.collaboration import collaboration_snapshot
+
         run.state_json = {
             "engine": "langchain",
             "plan": final_state.get("plan"),
             "observations": final_state.get("observations"),
             "used_non_python_tool": final_state.get("used_non_python_tool"),
+            "multi_agent": collaboration_snapshot(final_state, self.settings),
         }
         self.db.commit()

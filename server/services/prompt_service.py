@@ -104,6 +104,10 @@ def get_active_content(db: Session | None, name: str = DEFAULT_PROMPT_NAME) -> s
     return row.content if row else None
 
 
+def resolve_role_system(db: Session | None, name: str, fallback: str) -> str:
+    override = get_active_content(db, name)
+    return override or fallback
+
+
 def resolve_planner_system(db: Session | None = None) -> str:
-    override = get_active_content(db, DEFAULT_PROMPT_NAME)
-    return override or PLANNER_SYSTEM
+    return resolve_role_system(db, DEFAULT_PROMPT_NAME, PLANNER_SYSTEM)

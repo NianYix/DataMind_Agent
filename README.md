@@ -41,6 +41,22 @@ cd apps/web && pnpm install && pnpm dev
 - Knowledge（RAG）：http://localhost:3000/knowledge  
 - MCP：http://localhost:3000/mcp  
 
+## V8 Multi-Agent
+
+| 能力 | 说明 |
+|------|------|
+| Handoff / Roster | Run 级 `agents_involved` + `handoffs`（写入 `state_json.multi_agent`） |
+| Blackboard | Analyst/Insight/Critic 共享草稿；Inspector **Agents** Tab |
+| Critic | `CRITIC_ENABLED`（默认关）；不通过则标风险并继续 Report |
+| Prompts | 可覆盖 `system_analyst` / `system_insight` / `system_critic` |
+| API | `GET /api/agent-runs/{id}/collaboration` |
+
+```bash
+# .env
+MULTI_AGENT_ENABLED=true
+CRITIC_ENABLED=false
+```
+
 ## V7 MCP
 
 | 能力 | 说明 |

@@ -13,13 +13,14 @@ from sqlalchemy.orm import Session
 
 from agent import cancel as cancel_registry
 from agent.events import chart_event, observation_event, step_event
+from agent.lc.collaboration import enter_role, patch_blackboard
 from agent.lc.llm import get_chat_model
 from agent.lc.state import GraphState
 from agent.lc.tools import build_tools
 from agent.prompts import (
     ANALYST_SYSTEM,
+    CRITIC_SYSTEM,
     INSIGHT_SYSTEM,
-    PLANNER_SYSTEM,
     REPORT_SYSTEM,
     SUPERVISOR_SYSTEM,
     TOOL_PICKER_SYSTEM,
@@ -58,6 +59,14 @@ class InsightOut(BaseModel):
 
 class ReportOut(BaseModel):
     markdown: str
+
+
+class CriticOut(BaseModel):
+    passed: bool = Field(description="Whether insights are acceptable", alias="pass")
+    issues: list[str] = Field(default_factory=list)
+    suggestions: list[str] = Field(default_factory=list)
+
+    model_config = {"populate_by_name": True}
 
 
 def _cfg(config: RunnableConfig) -> dict[str, Any]:
@@ -124,16 +133,18 @@ def _extract_json(text: str) -> dict[str, Any]:
 
 
 def understand_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
+    collab = enter_role(state, "Understand", reason="load dataset schema")
     _emit(config, step_event("understand", "Loading dataset schema and profile"))
     result = run_tool("dataset_schema", {}, _ctx(state))
     schema = result if result.get("fields") else state.get("schema_info") or {}
     _add_step(_db(config), state["run_id"], "Understand", state["question"], "Schema loaded")
-    return {"schema_info": schema, "status": "running"}
+    return {**collab, "schema_info": schema, "status": "running"}
 
 
 def plan_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
     from server.services.prompt_service import resolve_planner_system
 
+    collab = enter_role(state, "Planner", reason="generate analysis plan")
     _emit(config, step_event("planner", "Generating analysis plan"))
     model = get_chat_model()
     planner_sys = resolve_planner_system(_db(config))
@@ -175,6 +186,7 @@ def plan_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
     )
     _emit(config, step_event("plan", "Plan ready", steps=steps, goal=goal))
     return {
+        **collab,
         "plan": steps,
         "input_tokens": int(state.get("input_tokens") or 0) + in_tok,
         "output_tokens": int(state.get("output_tokens") or 0) + out_tok,
@@ -184,22 +196,23 @@ def plan_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
 
 def supervisor_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
     settings = get_settings()
+    collab = enter_role(state, "Supervisor", reason="decide next action")
     run_id = state["run_id"]
     if cancel_registry.is_cancelled(run_id):
         _emit(config, step_event("cancelled", "Run cancelled by user"))
-        return {"status": "cancelled", "next_action": "end"}
+        return {**collab, "status": "cancelled", "next_action": "end"}
 
     started = float(state.get("started_at") or time.time())
     if time.time() - started > settings.run_timeout_sec:
         _emit(config, step_event("timeout", "Run timeout reached"))
-        return {"status": "error", "error": "RUN_TIMEOUT", "next_action": "insight"}
+        return {**collab, "status": "error", "error": "RUN_TIMEOUT", "next_action": "insight"}
 
     if int(state.get("step_count") or 0) >= settings.max_agent_steps:
-        return {"next_action": "insight", "error": "MAX_STEPS"}
+        return {**collab, "next_action": "insight", "error": "MAX_STEPS"}
 
     pending = [s for s in (state.get("plan") or []) if s.get("status") == "pending"]
     if not pending and (state.get("observations") or []):
-        return {"next_action": "insight", "preferred_tool": None}
+        return {**collab, "next_action": "insight", "preferred_tool": None}
 
     model = get_chat_model()
     payload = {
@@ -239,6 +252,7 @@ def supervisor_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]
     _emit(config, step_event("supervisor", reason or f"action={action}", action=action, preferred_tool=preferred))
     _add_step(_db(config), run_id, "Supervisor", state["question"], f"{action}: {reason}")
     return {
+        **collab,
         "next_action": action,
         "preferred_tool": preferred,
         "input_tokens": int(state.get("input_tokens") or 0) + in_tok,
@@ -248,10 +262,11 @@ def supervisor_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]
 
 def agent_tools_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
     """Select one tool via LangChain bind_tools and execute it."""
+    collab = enter_role(state, "Tools", reason="execute tool step")
     plan = list(state.get("plan") or [])
     pending = next((s for s in plan if s.get("status") == "pending"), None)
     if not pending:
-        return {"next_action": "insight"}
+        return {**collab, "next_action": "insight"}
 
     pending["status"] = "running"
     step_id = pending["id"]
@@ -381,6 +396,7 @@ def agent_tools_node(state: GraphState, config: RunnableConfig) -> dict[str, Any
     messages.append(ToolMessage(content=json.dumps(result, ensure_ascii=False, default=str), tool_call_id=tool_call_id))
 
     return {
+        **collab,
         "plan": plan,
         "step_count": int(state.get("step_count") or 0) + 1,
         "current_step_id": step_id,
@@ -396,6 +412,7 @@ def agent_tools_node(state: GraphState, config: RunnableConfig) -> dict[str, Any
 
 
 def observe_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
+    collab = enter_role(state, "Analyst", reason="interpret tool result")
     model = get_chat_model()
     pending_desc = ""
     for s in state.get("plan") or []:
@@ -490,7 +507,13 @@ def observe_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
         _emit(config, chart_event(chart_id, str(chart_hint["title"]), option))
 
     next_action = "insight" if is_complete else "supervisor"
+    board = patch_blackboard(
+        {**state, **collab},
+        {"key_metrics": (summary or "")[:500], "last_claim": (claim or "")[:500]},
+    )
     return {
+        **collab,
+        **board,
         "observations": observations,
         "plan": plan,
         "next_action": next_action,
@@ -500,22 +523,27 @@ def observe_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
 
 
 def insight_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
+    from server.services.prompt_service import resolve_role_system
+
+    collab = enter_role(state, "Insight", reason="synthesize insights")
     _emit(config, step_event("insight", "Extracting business insights"))
     model = get_chat_model()
+    insight_sys = resolve_role_system(_db(config), "system_insight", INSIGHT_SYSTEM)
     payload = {
         "question": state["question"],
         "observations": [o.get("summary") for o in (state.get("observations") or [])],
+        "blackboard": state.get("blackboard") or {},
     }
     try:
         out: InsightOut = model.with_structured_output(InsightOut).invoke(
-            [SystemMessage(content=INSIGHT_SYSTEM), HumanMessage(content=json.dumps(payload, ensure_ascii=False))]
+            [SystemMessage(content=insight_sys), HumanMessage(content=json.dumps(payload, ensure_ascii=False))]
         )
         in_tok = out_tok = 0
         insights, final_answer = out.insights, out.final_answer
     except Exception:  # noqa: BLE001
         msg = model.invoke(
             [
-                SystemMessage(content=INSIGHT_SYSTEM + "\nReturn STRICT JSON."),
+                SystemMessage(content=insight_sys + "\nReturn STRICT JSON."),
                 HumanMessage(content=json.dumps(payload, ensure_ascii=False)),
             ]
         )
@@ -532,7 +560,76 @@ def insight_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
         db.add(Insight(run_id=state["run_id"], payload_json=item if isinstance(item, dict) else {"text": str(item)}))
     db.commit()
     _add_step(db, state["run_id"], "Insight", state["question"], final_answer)
+    board = patch_blackboard(
+        {**state, **collab},
+        {"draft_answer": (final_answer or "")[:800]},
+    )
     return {
+        **collab,
+        **board,
+        "final_answer": final_answer,
+        "input_tokens": int(state.get("input_tokens") or 0) + in_tok,
+        "output_tokens": int(state.get("output_tokens") or 0) + out_tok,
+    }
+
+
+def critic_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
+    from server.services.prompt_service import resolve_role_system
+
+    collab = enter_role(state, "Critic", reason="review insights")
+    _emit(config, step_event("critic", "Reviewing insights for risks"))
+    model = get_chat_model()
+    critic_sys = resolve_role_system(_db(config), "system_critic", CRITIC_SYSTEM)
+    payload = {
+        "question": state["question"],
+        "observations": [o.get("summary") for o in (state.get("observations") or [])],
+        "final_answer": state.get("final_answer"),
+        "blackboard": state.get("blackboard") or {},
+    }
+    try:
+        out: CriticOut = model.with_structured_output(CriticOut).invoke(
+            [SystemMessage(content=critic_sys), HumanMessage(content=json.dumps(payload, ensure_ascii=False))]
+        )
+        in_tok = out_tok = 0
+        passed, issues, suggestions = bool(out.passed), list(out.issues or []), list(out.suggestions or [])
+    except Exception:  # noqa: BLE001
+        msg = model.invoke(
+            [
+                SystemMessage(content=critic_sys + "\nReturn STRICT JSON."),
+                HumanMessage(content=json.dumps(payload, ensure_ascii=False)),
+            ]
+        )
+        in_tok, out_tok = _usage(msg)
+        data = _extract_json(str(msg.content))
+        passed = bool(data.get("pass", data.get("passed", True)))
+        issues = [str(x) for x in (data.get("issues") or [])]
+        suggestions = [str(x) for x in (data.get("suggestions") or [])]
+
+    critic_result = {"pass": passed, "issues": issues, "suggestions": suggestions}
+    board_updates: dict[str, Any] = {}
+    final_answer = state.get("final_answer") or ""
+    if not passed:
+        board_updates["critic_issues"] = issues
+        existing_risks = list((state.get("blackboard") or {}).get("risks") or [])
+        if not isinstance(existing_risks, list):
+            existing_risks = [str(existing_risks)]
+        board_updates["risks"] = existing_risks + issues
+        if issues:
+            caveat = "；".join(issues[:3])
+            final_answer = f"{final_answer}\n\n【风险提示】{caveat}".strip()
+
+    board = patch_blackboard({**state, **collab}, board_updates) if board_updates else {}
+    _add_step(
+        _db(config),
+        state["run_id"],
+        "Critic",
+        state["question"],
+        f"pass={passed}; issues={len(issues)}",
+    )
+    return {
+        **collab,
+        **board,
+        "critic_result": critic_result,
         "final_answer": final_answer,
         "input_tokens": int(state.get("input_tokens") or 0) + in_tok,
         "output_tokens": int(state.get("output_tokens") or 0) + out_tok,
@@ -540,12 +637,15 @@ def insight_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
 
 
 def report_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
+    collab = enter_role(state, "Report", reason="write markdown report")
     _emit(config, step_event("report", "Generating markdown report"))
     model = get_chat_model()
     payload = {
         "question": state["question"],
         "observations": [o.get("summary") for o in (state.get("observations") or [])],
         "final_answer": state.get("final_answer"),
+        "blackboard": state.get("blackboard") or {},
+        "critic_result": state.get("critic_result"),
     }
     try:
         out: ReportOut = model.with_structured_output(ReportOut).invoke(
@@ -569,7 +669,9 @@ def report_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
     db.add(report)
     db.commit()
     db.refresh(report)
+    _add_step(db, state["run_id"], "Report", state["question"], (markdown or "")[:500])
     return {
+        **collab,
         "report_markdown": markdown,
         "report_id": report.id,
         "status": "done" if state.get("status") != "cancelled" else "cancelled",
@@ -593,6 +695,12 @@ def route_after_observe(state: GraphState) -> str:
     if state.get("next_action") == "insight":
         return "insight"
     return "supervisor"
+
+
+def route_after_insight(state: GraphState) -> str:
+    if get_settings().critic_enabled:
+        return "critic"
+    return "report"
 
 
 def _preview(value: Any, limit: int = 40) -> Any:

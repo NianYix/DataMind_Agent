@@ -45,6 +45,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [health, setHealth] = useState("checking");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [collaboration, setCollaboration] = useState<import("@/components/inspector/Inspector").CollaborationInfo | null>(null);
 
   const selectedDataset = useMemo(
     () => datasets.find((d) => d.id === datasetId) || dataset,
@@ -133,12 +134,13 @@ export default function HomePage() {
 
   async function loadRun(id: string) {
     setRunId(id);
-    const [trace, chartsRes, reportRes, evs, run] = await Promise.all([
+    const [trace, chartsRes, reportRes, evs, run, collab] = await Promise.all([
       api.trace(id),
       api.charts(id),
       api.report(id).catch(() => null),
       api.evidences(id).catch(() => []),
       api.run(id).catch(() => null),
+      api.collaboration(id).catch(() => null),
     ]);
     setSteps(trace);
     setLiveTrace([]);
@@ -146,6 +148,7 @@ export default function HomePage() {
     setReport(reportRes?.markdown || "");
     setEvidences(evs);
     setEvidence(evs[0] || null);
+    setCollaboration(collab);
     if (run) {
       setMetrics({
         input_tokens: run.input_tokens,
@@ -213,6 +216,7 @@ export default function HomePage() {
     setMetrics({});
     setRunId(null);
     setSelectedNodeId(null);
+    setCollaboration(null);
 
     try {
       const cid = await ensureConversation();
@@ -381,6 +385,7 @@ export default function HomePage() {
               charts={charts}
               report={report}
               runId={runId}
+              collaboration={collaboration}
             />
           </div>
         </div>

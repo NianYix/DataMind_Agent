@@ -172,6 +172,18 @@ def get_trace(db: Session, run_id: str) -> list[AgentStep]:
     return db.query(AgentStep).filter(AgentStep.run_id == run_id).order_by(AgentStep.seq.asc()).all()
 
 
+def get_collaboration(db: Session, run_id: str) -> dict:
+    from agent.lc.collaboration import empty_collaboration
+    from server.core.config import get_settings
+
+    run = get_run(db, run_id)
+    state = run.state_json or {}
+    multi = state.get("multi_agent")
+    if isinstance(multi, dict):
+        return multi
+    return empty_collaboration(get_settings())
+
+
 def get_evidence(db: Session, evidence_id: str) -> Evidence:
     ev = db.get(Evidence, evidence_id)
     if not ev:

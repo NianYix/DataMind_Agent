@@ -186,6 +186,22 @@ export const api = {
     request<AgentRun>(`/api/agent-runs/${runId}/cancel`, { method: "POST" }),
   run: (runId: string) => request<AgentRun>(`/api/agent-runs/${runId}`),
   trace: (runId: string) => request<AgentStep[]>(`/api/agent-runs/${runId}/trace`),
+  collaboration: (runId: string) =>
+    request<{
+      enabled: boolean;
+      critic_enabled: boolean;
+      agents_involved: string[];
+      handoffs: Array<{
+        id?: string;
+        from_agent: string;
+        to_agent: string;
+        reason?: string;
+        summary?: string | null;
+        at?: number;
+      }>;
+      blackboard: Record<string, unknown>;
+      critic_result?: { pass?: boolean; issues?: string[]; suggestions?: string[] } | null;
+    }>(`/api/agent-runs/${runId}/collaboration`),
   evidence: (id: string) => request<Evidence>(`/api/evidences/${id}`),
   evidences: (runId: string) => request<Evidence[]>(`/api/agent-runs/${runId}/evidences`),
   report: (runId: string) =>

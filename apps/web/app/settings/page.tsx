@@ -19,6 +19,8 @@ type Settings = {
   profile_sample_rows: number;
   sql_max_rows: number;
   app_api_key_required: boolean;
+  multi_agent_enabled?: boolean;
+  critic_enabled?: boolean;
 };
 
 type Metrics = {
@@ -113,6 +115,10 @@ export default function SettingsPage() {
             <div>
               <h1 className="text-lg font-semibold">Settings</h1>
               <p className="text-xs text-[var(--text-muted)]">模型、限额与运维指标</p>
+              <p className="mt-2 font-mono text-[11px] text-[var(--text-muted)]">
+                MULTI_AGENT={String(settings.multi_agent_enabled ?? true)} · CRITIC={String(settings.critic_enabled ?? false)}{" "}
+                <span className="text-[var(--text-muted)]">（.env 只读）</span>
+              </p>
             </div>
             <label className="block text-sm">
               <span className="text-[var(--text-muted)]">LLM Base URL</span>

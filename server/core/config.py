@@ -83,6 +83,8 @@ class Settings(BaseSettings):
     rag_top_k: int = 5
     mcp_enabled: bool = False
     mcp_config_path: str = str(ROOT_DIR / "storage" / "mcp_servers.json")
+    multi_agent_enabled: bool = True
+    critic_enabled: bool = False
 
     @property
     def http_allowlist_prefixes(self) -> list[str]:

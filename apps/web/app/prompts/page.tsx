@@ -64,6 +64,10 @@ export default function PromptsPage() {
         <main className="mx-auto grid max-w-5xl gap-6 px-6 py-6 lg:grid-cols-[1fr_1fr]">
           <form onSubmit={onCreate} className="panel space-y-3 rounded-md p-4">
             <h1 className="text-lg font-semibold">Prompts</h1>
+            <p className="text-xs text-[var(--text-muted)]">
+              可覆盖：<code className="font-mono">system_analyst</code>（Planner）、
+              <code className="font-mono">system_insight</code>、<code className="font-mono">system_critic</code>
+            </p>
             <label className="block text-sm">
               <span className="text-[var(--text-muted)]">Name</span>
               <input className="input-dark mt-1 w-full" value={name} onChange={(e) => setName(e.target.value)} />

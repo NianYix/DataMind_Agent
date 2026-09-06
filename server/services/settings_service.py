@@ -38,6 +38,8 @@ def get_public_settings() -> dict[str, Any]:
         "http_url_allowlist": s.http_url_allowlist,
         "http_max_response_bytes": s.http_max_response_bytes,
         "web_search_enabled": s.web_search_enabled,
+        "multi_agent_enabled": s.multi_agent_enabled,
+        "critic_enabled": s.critic_enabled,
     }
 
 

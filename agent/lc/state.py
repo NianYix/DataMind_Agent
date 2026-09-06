@@ -38,3 +38,8 @@ class GraphState(TypedDict, total=False):
     last_tool_code: str | None
     last_tool_call_id: str | None
     started_at: float
+    handoffs: list[dict[str, Any]]
+    blackboard: dict[str, Any]
+    agents_involved: list[str]
+    last_agent: str | None
+    critic_result: dict[str, Any] | None
