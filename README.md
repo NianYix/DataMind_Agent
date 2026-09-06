@@ -38,6 +38,25 @@ cd apps/web && pnpm install && pnpm dev
 - Data Sources：http://localhost:3000/data-sources  
 - Prompts：http://localhost:3000/prompts  
 - Login：http://localhost:3000/login  
+- Knowledge（RAG）：http://localhost:3000/knowledge  
+
+## V6 RAG Knowledge
+
+| 能力 | 说明 |
+|------|------|
+| 知识库 | Workspace 级 KB；上传 `.md` / `.txt` / `.pdf` |
+| 管线 | 切分 → Embedding → **Chroma**（`storage/chroma`） |
+| Tool | Agent `knowledge_search`（口径/定义类问题） |
+| Embedding | `EMBEDDING_PROVIDER=mock`（CI/默认 Demo）或 `openai_compatible` |
+
+样例文档：`samples/knowledge/east_china_metric.md`
+
+```bash
+# .env
+EMBEDDING_PROVIDER=mock
+CHROMA_PATH=./storage/chroma
+KNOWLEDGE_DIR=./storage/knowledge
+```
 
 ## V5 企业切片
 
@@ -61,7 +80,8 @@ WEB_SEARCH_ENABLED=false
 
 - `samples/sales.csv` — 合成电商下降场景  
 - `samples/superstore_clean.csv` — 公开 Superstore 清洗版  
-- `samples/sales.sqlite` — SQLite 源（表名 `sales`）
+- `samples/sales.sqlite` — SQLite 源（表名 `sales`）  
+- `samples/knowledge/east_china_metric.md` — RAG 口径样例  
 
 ## Evaluation（V4）
 
@@ -115,6 +135,7 @@ Suite 定义：`evaluation/datasets/sales_suite.json`。
 - V4 Evaluation：`specs/v4/`  
 - UI Optimize：`specs/ui_optimize/`  
 - V5 Enterprise：`specs/v5/`  
+- V6 RAG：`specs/v6/`  
 - LangChain 重构：`specs/langchain/`  
 
 ## 测试

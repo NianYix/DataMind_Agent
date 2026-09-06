@@ -262,6 +262,42 @@ export const api = {
       body: JSON.stringify({ version }),
     });
   },
+  knowledgeBases: (workspaceId?: string) =>
+    request<Array<{ id: string; name: string; description?: string | null; workspace_id: string }>>(
+      `/api/knowledge-bases${workspaceId ? `?workspace_id=${workspaceId}` : ""}`,
+    ),
+  createKnowledgeBase: (body: { workspace_id?: string; name: string; description?: string }, apiKey?: string) => {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (apiKey) headers["X-API-Key"] = apiKey;
+    return request<{ id: string; name: string; workspace_id: string }>("/api/knowledge-bases", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+  },
+  knowledgeDocuments: (kbId: string) =>
+    request<
+      Array<{ id: string; filename: string; status: string; chunk_count: number; error?: string | null }>
+    >(`/api/knowledge-bases/${kbId}/documents`),
+  uploadKnowledgeDocument: async (kbId: string, file: File, apiKey?: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    const headers: Record<string, string> = {};
+    if (apiKey) headers["X-API-Key"] = apiKey;
+    return request<{ id: string; filename: string; status: string; chunk_count: number }>(
+      `/api/knowledge-bases/${kbId}/documents`,
+      { method: "POST", headers, body: form },
+    );
+  },
+  searchKnowledge: (kbId: string, query: string, topK?: number) =>
+    request<{ success: boolean; results: Array<{ text: string; filename?: string; score?: number; doc_id?: string }>; message?: string; error?: string }>(
+      `/api/knowledge-bases/${kbId}/search`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, top_k: topK }),
+      },
+    ),
 };
 
 

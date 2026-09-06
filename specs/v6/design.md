@@ -2,7 +2,8 @@
 
 > 对应：`specs/v6/requirements.md`（**已确认**，D1–D6 按推荐锁定）  
 > 基线：V5 + UI Optimize  
-> 状态：待审阅  
+> 状态：**已确认并已实现**  
+> 基线：V5 + UI Optimize  
 > 非目标：MCP / SSO / OCR
 
 ---
