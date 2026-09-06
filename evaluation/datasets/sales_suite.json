@@ -1,0 +1,68 @@
+{
+  "id": "sales_suite",
+  "name": "Sales Analysis Suite",
+  "description": "Core demo cases for sales drop / drill-down evaluation",
+  "cases": [
+    {
+      "id": "trend_drop",
+      "question": "为什么 8 月销售下降？",
+      "dataset": "samples/sales.csv",
+      "expect": {
+        "must_mention": ["8", "下降"],
+        "prefer_tools": ["sql_query", "python_execute", "statistics"],
+        "max_steps": 20,
+        "numbers": [{"value": 17.0, "tolerance": 8.0}]
+      }
+    },
+    {
+      "id": "region_focus",
+      "question": "哪个地区对销售下降影响最大？",
+      "dataset": "samples/sales.csv",
+      "expect": {
+        "must_mention": ["华东"],
+        "prefer_tools": ["sql_query", "statistics"],
+        "max_steps": 15
+      }
+    },
+    {
+      "id": "product_sku",
+      "question": "哪个商品或 SKU 下降最明显？",
+      "dataset": "samples/sales.csv",
+      "expect": {
+        "must_mention": ["SKU"],
+        "prefer_tools": ["sql_query", "python_execute"],
+        "max_steps": 15
+      }
+    },
+    {
+      "id": "anomaly_sales",
+      "question": "帮我找出销售额异常值情况",
+      "dataset": "samples/sales.csv",
+      "expect": {
+        "must_mention": ["异常"],
+        "prefer_tools": ["anomaly_detection", "statistics"],
+        "max_steps": 12
+      }
+    },
+    {
+      "id": "superstore_region",
+      "question": "哪个 Region 销售额最高？给出结论",
+      "dataset": "samples/superstore_clean.csv",
+      "expect": {
+        "must_mention": ["West", "Region"],
+        "prefer_tools": ["sql_query", "statistics"],
+        "max_steps": 12
+      }
+    },
+    {
+      "id": "followup_filter",
+      "question": "只看华东地区的销售情况",
+      "dataset": "samples/sales.csv",
+      "expect": {
+        "must_mention": ["华东"],
+        "prefer_tools": ["sql_query", "python_execute"],
+        "max_steps": 12
+      }
+    }
+  ]
+}

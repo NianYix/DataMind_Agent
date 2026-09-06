@@ -1,0 +1,180 @@
+@import "tailwindcss";
+
+:root {
+  --bg-0: #0b0d10;
+  --bg-1: #0f1115;
+  --bg-2: #14171c;
+  --panel: #15181e;
+  --panel-2: #181c22;
+  --border: #252a32;
+  --border-strong: #303640;
+  --text: #e6eaf0;
+  --text-muted: #8b949e;
+  --primary: #5b8cff;
+  --ai: #8b7cff;
+  --success: #35c98b;
+  --warning: #f5b942;
+  --error: #ff5c68;
+  --grid-dot: #1a1f28;
+  --node-ai: #8b7cff;
+  --node-logic: #5b8cff;
+  --node-data: #2ec4b6;
+  --node-action: #f5b942;
+  --node-system: #6b7280;
+  --background: var(--bg-0);
+  --foreground: var(--text);
+  --accent: var(--primary);
+  --muted: var(--text-muted);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--bg-0);
+  color: var(--text);
+  font-family: var(--font-inter), "Segoe UI", sans-serif;
+}
+
+.font-mono,
+.mono {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.panel-2 {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+
+.input-dark {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.input-dark:focus {
+  border-color: var(--primary);
+}
+
+.input-dark:disabled {
+  opacity: 0.5;
+}
+
+.btn {
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: background 150ms ease, border-color 150ms ease, opacity 150ms ease;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--bg-2);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+}
+
+.btn-primary {
+  background: color-mix(in srgb, var(--primary) 22%, var(--panel-2));
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  color: var(--text);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 32%, var(--panel-2));
+}
+
+.btn-danger {
+  background: color-mix(in srgb, var(--error) 16%, var(--panel-2));
+  border-color: color-mix(in srgb, var(--error) 40%, var(--border));
+  color: #ffb4ba;
+}
+
+.btn-ghost {
+  background: transparent;
+}
+
+.label-caps {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.canvas-grid {
+  background-color: var(--bg-1);
+  background-image:
+    radial-gradient(circle, var(--grid-dot) 1px, transparent 1px),
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size:
+    16px 16px,
+    64px 64px,
+    64px 64px;
+  background-position:
+    0 0,
+    -1px -1px,
+    -1px -1px;
+}
+
+@keyframes flow-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.edge-active {
+  stroke-dasharray: 6 6;
+  animation: flow-dash 0.6s linear infinite;
+}
+
+@keyframes node-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent);
+  }
+}
+
+.node-running {
+  animation: node-breathe 1.6s ease-in-out infinite;
+}

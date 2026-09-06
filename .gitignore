@@ -1,0 +1,37 @@
+# DataMind Agent
+.env
+.env.local
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# storage
+storage/uploads/**
+!storage/uploads/.gitkeep
+storage/database/*.db
+storage/database/*.db-*
+storage/settings.json
+storage/logs/**
+!storage/logs/.gitkeep
+storage/chroma/**
+!storage/chroma/.gitkeep
+storage/knowledge/**
+!storage/knowledge/.gitkeep
+
+# frontend
+apps/web/node_modules/
+apps/web/.next/
+apps/web/out/
+apps/web/.env*.local
+
+# misc
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/

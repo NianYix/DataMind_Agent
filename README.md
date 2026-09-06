@@ -1,0 +1,128 @@
+# DataMind Agent
+
+AI 智能数据分析平台：自然语言 → **LangGraph Supervisor** → LangChain Tools（SQL/Python）→ 下钻 → 图表 / 报告 / Trace / Evidence。
+
+Agent 默认引擎：**LangChain + LangGraph**（`AGENT_ENGINE=langchain`）。可回滚：`AGENT_ENGINE=legacy`。
+
+## 快速开始
+
+### Windows
+
+```bat
+start.bat
+```
+
+### 手动
+
+```bash
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+# 编辑 .env：LLM_API_KEY=...
+# AGENT_ENGINE=langchain   # 或 legacy
+
+uvicorn server.main:app --reload --port 8000
+```
+
+```bash
+cd apps/web && pnpm install && pnpm dev
+```
+
+- 分析台（暗色 Logic Workspace）：http://localhost:3000  
+- Settings / Metrics：http://localhost:3000/settings  
+- Evaluation：http://localhost:3000/evaluation  
+
+前端为 **UI Optimize** 暗色工程工作台：TopBar + AgentPanel + Logic Canvas（Trace 只读节点图）+ Inspector + ExecutionBar。
+
+- Data Sources：http://localhost:3000/data-sources  
+- Prompts：http://localhost:3000/prompts  
+- Login：http://localhost:3000/login  
+
+## V5 企业切片
+
+| 能力 | 说明 |
+|------|------|
+| Data Sources | MySQL / PostgreSQL / **mock** 连接；测试连接；表注册为 Dataset |
+| Prompts | `system_analyst` 版本化 + 激活，注入 Planner |
+| HTTP Tool | `http_request`（`HTTP_URL_ALLOWLIST`）；`WEB_SEARCH_ENABLED` 默认关 |
+| Auth | `AUTH_ENABLED=false` 默认；开启后 JWT + 种子 `admin`/`admin` |
+
+驱动：`pymysql`、`psycopg`（见 `requirements.txt`）。无真实库时用 `db_type=mock` 验收。
+
+```bash
+# .env
+AUTH_ENABLED=false
+HTTP_URL_ALLOWLIST=https://httpbin.org/,https://api.github.com/
+WEB_SEARCH_ENABLED=false
+```
+
+## 测试数据
+
+- `samples/sales.csv` — 合成电商下降场景  
+- `samples/superstore_clean.csv` — 公开 Superstore 清洗版  
+- `samples/sales.sqlite` — SQLite 源（表名 `sales`）
+
+## Evaluation（V4）
+
+可复跑评测：Suite JSON → Runner（mock / live）→ 启发式 scorers → `eval_runs` 落库 → API / UI。
+
+### CLI
+
+```bash
+python -m evaluation --list
+python -m evaluation --suite sales_suite --mode mock
+```
+
+### API
+
+| Method | Path | 说明 |
+|--------|------|------|
+| GET | `/api/evaluation-suites` | 可用 suite |
+| POST | `/api/evaluations` | `{suite_id, mode}`；若配置了 `APP_API_KEY` 需 `X-API-Key` |
+| GET | `/api/evaluations` | 历史 |
+| GET | `/api/evaluations/{id}` | 详情 + cases |
+| GET | `/api/evaluations/{id}/summary` | 仅汇总 |
+
+### Mode
+
+| Mode | 说明 |
+|------|------|
+| `mock` | 不调 LLM；按 `expect.must_mention` 生成答案，适合 CI |
+| `live` | 走真实 `create_runtime`（需 LLM Key） |
+
+### 指标含义
+
+| 指标 | 含义 |
+|------|------|
+| Task Success | `must_mention`（及 numbers）全部命中 |
+| Tool / Python / SQL Success | 工具调用成功率 |
+| Insight / Calculation / Hallucination | **heuristic** 启发式，非 LLM-as-judge |
+| Avg Steps / Latency / Tokens | case 算术平均 |
+
+Suite 定义：`evaluation/datasets/sales_suite.json`。
+
+## Agent 引擎
+
+| 值 | 说明 |
+|----|------|
+| `langchain`（默认） | LangGraph StateGraph + ChatOpenAI + StructuredTool |
+| `legacy` | 自研 `agent/runtime.py` |
+
+## 文档
+
+- V1–V3：`specs/`、`specs/v2/`、`specs/v3/`  
+- V4 Evaluation：`specs/v4/`  
+- UI Optimize：`specs/ui_optimize/`  
+- V5 Enterprise：`specs/v5/`  
+- LangChain 重构：`specs/langchain/`  
+
+## 测试
+
+```bash
+pytest -q
+```
+
+## 原则
+
+数值结论必须来自工具真实执行，而非 LLM 直接计算。
