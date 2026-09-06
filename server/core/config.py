@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     mcp_config_path: str = str(ROOT_DIR / "storage" / "mcp_servers.json")
     multi_agent_enabled: bool = True
     critic_enabled: bool = False
+    workflow_mock_analyze: bool = False
+    workflow_timeout_sec: int = 600
 
     @property
     def http_allowlist_prefixes(self) -> list[str]:

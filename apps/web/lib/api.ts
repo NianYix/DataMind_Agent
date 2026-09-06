@@ -346,6 +346,78 @@ export const api = {
     if (apiKey) headers["X-API-Key"] = apiKey;
     return request<Record<string, unknown>>("/api/mcp/reload", { method: "POST", headers });
   },
+  workflowTemplates: () =>
+    request<Array<{ id: string; name: string; description?: string; graph: Record<string, unknown> }>>(
+      "/api/workflow-templates",
+    ),
+  workflows: (workspaceId: string) =>
+    request<
+      Array<{
+        id: string;
+        workspace_id: string;
+        name: string;
+        description?: string | null;
+        version: number;
+        enabled: boolean;
+        graph: Record<string, unknown>;
+      }>
+    >(`/api/workflows?workspace_id=${workspaceId}`),
+  createWorkflow: (
+    body: {
+      workspace_id: string;
+      name?: string;
+      description?: string;
+      graph?: Record<string, unknown>;
+      template_id?: string;
+    },
+    apiKey?: string,
+  ) => {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (apiKey) headers["X-API-Key"] = apiKey;
+    return request("/api/workflows", { method: "POST", headers, body: JSON.stringify(body) });
+  },
+  updateWorkflow: (
+    id: string,
+    body: { name?: string; description?: string; graph?: Record<string, unknown>; enabled?: boolean },
+    apiKey?: string,
+  ) => {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (apiKey) headers["X-API-Key"] = apiKey;
+    return request(`/api/workflows/${id}`, { method: "PUT", headers, body: JSON.stringify(body) });
+  },
+  deleteWorkflow: (id: string, apiKey?: string) => {
+    const headers: Record<string, string> = {};
+    if (apiKey) headers["X-API-Key"] = apiKey;
+    return request(`/api/workflows/${id}`, { method: "DELETE", headers });
+  },
+  startWorkflowRun: (id: string, body?: { question?: string; dataset_id?: string }) =>
+    request<{
+      id: string;
+      status: string;
+      context: Record<string, unknown>;
+      error?: string | null;
+    }>(`/api/workflows/${id}/runs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    }),
+  workflowRun: (runId: string) =>
+    request<{ id: string; status: string; context: Record<string, unknown>; error?: string | null }>(
+      `/api/workflow-runs/${runId}`,
+    ),
+  workflowRunSteps: (runId: string) =>
+    request<
+      Array<{
+        id: string;
+        seq: number;
+        node_id: string;
+        node_type: string;
+        status: string;
+        output?: Record<string, unknown> | null;
+        error?: string | null;
+        agent_run_id?: string | null;
+      }>
+    >(`/api/workflow-runs/${runId}/steps`),
 };
 
 

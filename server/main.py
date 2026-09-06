@@ -20,6 +20,7 @@ from server.api.knowledge import router as knowledge_router
 from server.api.mcp import router as mcp_router
 from server.api.ops import router as ops_router
 from server.api.prompts import router as prompts_router
+from server.api.workflows import router as workflows_router
 from server.api.workspaces import router as workspaces_router
 from server.core.config import get_settings
 from server.core.db import SessionLocal, init_db
@@ -62,7 +63,7 @@ async def lifespan(_app: FastAPI):
         pass
 
 
-app = FastAPI(title="DataMind Agent API", version="0.8.0", lifespan=lifespan)
+app = FastAPI(title="DataMind Agent API", version="0.9.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -79,6 +80,7 @@ app.include_router(datasources_router)
 app.include_router(prompts_router)
 app.include_router(knowledge_router)
 app.include_router(mcp_router)
+app.include_router(workflows_router)
 
 
 @app.get("/api/health")
@@ -87,9 +89,10 @@ def health():
     return {
         "status": "ok",
         "app": "DataMind Agent",
-        "version": "0.8.0",
+        "version": "0.9.0",
         "auth_enabled": cfg.auth_enabled,
         "mcp_enabled": cfg.mcp_enabled,
         "multi_agent_enabled": cfg.multi_agent_enabled,
         "critic_enabled": cfg.critic_enabled,
+        "workflow_mock_analyze": cfg.workflow_mock_analyze,
     }
