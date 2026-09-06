@@ -55,6 +55,10 @@ class KnowledgeSearchInput(BaseModel):
     top_k: int | None = Field(default=None, description="Number of chunks to return")
 
 
+class McpToolInput(BaseModel):
+    arguments: dict[str, Any] = Field(default_factory=dict, description="Arguments for the MCP tool")
+
+
 def _dumps(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False, default=str)
 
@@ -141,4 +145,35 @@ def build_tools(ctx: ToolContext) -> list[StructuredTool]:
         tools.append(
             StructuredTool.from_function(func=web_search, name="web_search", description="Web search (stub/provider)", args_schema=WebSearchInput)
         )
+
+    if get_settings().mcp_enabled:
+        try:
+            from mcp_host.bridge import list_mcp_tool_descriptors
+
+            for desc in list_mcp_tool_descriptors():
+                bridged = desc.bridged_name
+
+                def _make(name: str = bridged):
+                    def _call(arguments: dict[str, Any] | None = None) -> str:
+                        payload = arguments or {}
+                        if (
+                            isinstance(payload, dict)
+                            and set(payload.keys()) == {"arguments"}
+                            and isinstance(payload.get("arguments"), dict)
+                        ):
+                            payload = payload["arguments"]
+                        return _dumps(run_tool(name, payload, ctx))
+
+                    return _call
+
+                tools.append(
+                    StructuredTool.from_function(
+                        func=_make(),
+                        name=bridged,
+                        description=desc.description or f"MCP tool {desc.name} from {desc.server_id}",
+                        args_schema=McpToolInput,
+                    )
+                )
+        except Exception:  # noqa: BLE001
+            pass
     return tools

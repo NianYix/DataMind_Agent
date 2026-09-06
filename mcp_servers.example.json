@@ -1,0 +1,12 @@
+{
+  "servers": [
+    {
+      "id": "demo",
+      "enabled": true,
+      "transport": "stdio",
+      "command": "python",
+      "args": ["-m", "mcp_host.mock_server"],
+      "env": {}
+    }
+  ]
+}

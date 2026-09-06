@@ -23,6 +23,7 @@ from agent.prompts import (
     REPORT_SYSTEM,
     SUPERVISOR_SYSTEM,
     TOOL_PICKER_SYSTEM,
+    with_mcp_catalog,
 )
 from server.core.config import get_settings
 from server.models import AgentStep, Chart, Evidence, Insight, Report, ToolCall
@@ -211,14 +212,14 @@ def supervisor_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]
     }
     try:
         out: SupervisorOut = model.with_structured_output(SupervisorOut).invoke(
-            [SystemMessage(content=SUPERVISOR_SYSTEM), HumanMessage(content=json.dumps(payload, ensure_ascii=False))]
+            [SystemMessage(content=with_mcp_catalog(SUPERVISOR_SYSTEM)), HumanMessage(content=json.dumps(payload, ensure_ascii=False))]
         )
         in_tok = out_tok = 0
         action, reason, preferred = out.action, out.reason, out.preferred_tool
     except Exception:  # noqa: BLE001
         msg = model.invoke(
             [
-                SystemMessage(content=SUPERVISOR_SYSTEM + "\nReturn STRICT JSON."),
+                SystemMessage(content=with_mcp_catalog(SUPERVISOR_SYSTEM) + "\nReturn STRICT JSON."),
                 HumanMessage(content=json.dumps(payload, ensure_ascii=False)),
             ]
         )
@@ -271,7 +272,7 @@ def agent_tools_node(state: GraphState, config: RunnableConfig) -> dict[str, Any
     }
     ai = model.invoke(
         [
-            SystemMessage(content=TOOL_PICKER_SYSTEM),
+            SystemMessage(content=with_mcp_catalog(TOOL_PICKER_SYSTEM)),
             HumanMessage(content=json.dumps(user_payload, ensure_ascii=False)),
         ]
     )

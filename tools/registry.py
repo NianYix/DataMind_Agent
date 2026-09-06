@@ -160,7 +160,36 @@ TOOL_HANDLERS = {
 }
 
 
+def list_builtin_tool_names() -> list[str]:
+    return list(TOOL_HANDLERS.keys())
+
+
+def list_all_tool_names() -> list[str]:
+    names = list_builtin_tool_names()
+    try:
+        from mcp_host.bridge import list_mcp_tool_descriptors
+
+        names.extend(t.bridged_name for t in list_mcp_tool_descriptors())
+    except Exception:  # noqa: BLE001
+        pass
+    return names
+
+
 def run_tool(name: str, args: dict[str, Any] | None, ctx: ToolContext) -> dict[str, Any]:
+    if name.startswith("mcp_"):
+        try:
+            from mcp_host.bridge import call_mcp_tool
+
+            payload = args or {}
+            if (
+                isinstance(payload, dict)
+                and set(payload.keys()) == {"arguments"}
+                and isinstance(payload.get("arguments"), dict)
+            ):
+                payload = payload["arguments"]
+            return call_mcp_tool(name, payload)
+        except Exception as exc:  # noqa: BLE001
+            return {"success": False, "error": str(exc)}
     if name not in TOOL_HANDLERS:
         return {"success": False, "error": f"Unknown tool: {name}"}
     try:

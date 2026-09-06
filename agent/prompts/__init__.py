@@ -19,10 +19,11 @@ Return STRICT JSON:
 {
   "action": "call_tool|insight|finish",
   "reason": "short reason",
-  "preferred_tool": "sql_query|python_execute|statistics|anomaly_detection|generate_chart|knowledge_search|http_request|null"
+  "preferred_tool": "sql_query|python_execute|statistics|anomaly_detection|generate_chart|knowledge_search|http_request|mcp_*|null"
 }
 Prefer sql_query or statistics for aggregations when possible.
 Use knowledge_search for definitions, metric口径, policies, or historical documented conclusions.
+Use mcp_* bridged tools when they match the question and appear in the MCP tool catalog.
 Use insight when enough evidence exists.
 """
 
@@ -31,7 +32,26 @@ Available table name for SQL is always `data`.
 Respect memory filters in SQL/Python when provided.
 Prefer sql_query for group/aggregate questions; python_execute for complex transforms; statistics/anomaly_detection for quick stats.
 Use knowledge_search when the question asks for definitions, 口径, policies, or documented business rules.
+When MCP bridged tools (mcp_*) are listed, you may call them with appropriate arguments.
 """
+
+
+def with_mcp_catalog(system_prompt: str, limit: int = 20) -> str:
+    """Append dynamic MCP tool catalog when enabled."""
+    try:
+        from server.core.config import get_settings
+
+        if not get_settings().mcp_enabled:
+            return system_prompt
+        from mcp_host.bridge import mcp_tools_prompt_block
+
+        block = mcp_tools_prompt_block(limit=limit)
+        if not block:
+            return system_prompt
+        return system_prompt.rstrip() + "\n\n" + block
+    except Exception:  # noqa: BLE001
+        return system_prompt
+
 
 MEMORY_SYSTEM = """You update analysis conversation memory filters.
 Return STRICT JSON:

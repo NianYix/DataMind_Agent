@@ -298,6 +298,38 @@ export const api = {
         body: JSON.stringify({ query, top_k: topK }),
       },
     ),
+  mcpStatus: () =>
+    request<{
+      enabled: boolean;
+      config_path: string;
+      servers: Array<{
+        id: string;
+        status: string;
+        error?: string | null;
+        tool_count: number;
+        tools: Array<{
+          name: string;
+          original_name?: string;
+          description?: string;
+          input_schema?: Record<string, unknown>;
+        }>;
+      }>;
+    }>("/api/mcp/status"),
+  mcpTools: () =>
+    request<{
+      tools: Array<{
+        name: string;
+        original_name?: string;
+        description?: string;
+        server_id?: string;
+        input_schema?: Record<string, unknown>;
+      }>;
+    }>("/api/mcp/tools"),
+  mcpReload: (apiKey?: string) => {
+    const headers: Record<string, string> = {};
+    if (apiKey) headers["X-API-Key"] = apiKey;
+    return request<Record<string, unknown>>("/api/mcp/reload", { method: "POST", headers });
+  },
 };
 
 

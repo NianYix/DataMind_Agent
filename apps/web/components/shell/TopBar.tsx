@@ -19,7 +19,7 @@ export function TopBar({
   canRun,
   trailing,
 }: {
-  active: "workspace" | "settings" | "evaluation" | "data-sources" | "prompts" | "login" | "knowledge";
+  active: "workspace" | "settings" | "evaluation" | "data-sources" | "prompts" | "login" | "knowledge" | "mcp";
   health?: string;
   runStatus?: RunUiStatus;
   workspaces?: Workspace[];
@@ -83,6 +83,7 @@ export function TopBar({
       <div className="flex items-center gap-2">
         {nav("/", "workspace", "Workspace")}
         {nav("/knowledge", "knowledge", "Knowledge")}
+        {nav("/mcp", "mcp", "MCP")}
         {nav("/data-sources", "data-sources", "Data Sources")}
         {nav("/prompts", "prompts", "Prompts")}
         {nav("/evaluation", "evaluation", "Evaluation")}

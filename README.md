@@ -39,6 +39,28 @@ cd apps/web && pnpm install && pnpm dev
 - Prompts：http://localhost:3000/prompts  
 - Login：http://localhost:3000/login  
 - Knowledge（RAG）：http://localhost:3000/knowledge  
+- MCP：http://localhost:3000/mcp  
+
+## V7 MCP
+
+| 能力 | 说明 |
+|------|------|
+| MCP Client | `MCP_ENABLED` + `storage/mcp_servers.json`（stdio）→ 桥接为 `mcp_<server>_<tool>` |
+| Agent | 动态挂入 Tool Registry / LangChain；提示词附带工具目录 |
+| API / UI | `/api/mcp/status` · `/tools` · `/reload`；页面 `/mcp` |
+| Mock | `python -m mcp_host.mock_server`（`echo`）供 CI |
+| MCP Server（P1） | `python -m server.mcp_server`：只读 `ping` + `knowledge_search` |
+
+实现为 **Content-Length JSON-RPC 最小子集**（包名 `mcp_host`，避免与官方 `mcp` 包冲突）。官方 `mcp` SDK 仍列入依赖以备扩展。
+
+```bash
+# .env
+MCP_ENABLED=false
+MCP_CONFIG_PATH=./storage/mcp_servers.json
+
+# 启用时复制样例：
+# copy mcp_servers.example.json storage\mcp_servers.json
+```
 
 ## V6 RAG Knowledge
 

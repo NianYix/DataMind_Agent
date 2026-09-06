@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any
 
-from agent.prompts import MEMORY_SYSTEM, SUPERVISOR_SYSTEM, TOOL_PICKER_SYSTEM
+from agent.prompts import MEMORY_SYSTEM, SUPERVISOR_SYSTEM, TOOL_PICKER_SYSTEM, with_mcp_catalog
 from agent.state import AgentState
 from llm.gateway import LLMGateway
 from llm.types import ChatMessage, ToolCallRequest
@@ -34,7 +34,7 @@ def decide_next(gateway: LLMGateway, state: AgentState) -> tuple[dict[str, Any],
     }
     result = gateway.chat(
         [
-            ChatMessage("system", SUPERVISOR_SYSTEM),
+            ChatMessage("system", with_mcp_catalog(SUPERVISOR_SYSTEM)),
             ChatMessage("user", json.dumps(payload, ensure_ascii=False)),
         ],
         response_format={"type": "json_object"},
@@ -78,7 +78,7 @@ def pick_tool_call(
     )
     try:
         result = gateway.chat(
-            [ChatMessage("system", TOOL_PICKER_SYSTEM), ChatMessage("user", user)],
+            [ChatMessage("system", with_mcp_catalog(TOOL_PICKER_SYSTEM)), ChatMessage("user", user)],
             tools=TOOL_SCHEMAS,
             tool_choice="required",
         )
@@ -92,7 +92,7 @@ def pick_tool_call(
             [
                 ChatMessage(
                     "system",
-                    TOOL_PICKER_SYSTEM
+                    with_mcp_catalog(TOOL_PICKER_SYSTEM)
                     + '\nReturn STRICT JSON: {"tool_name":"...","arguments":{...}}',
                 ),
                 ChatMessage("user", user),

@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     rag_chunk_size: int = 800
     rag_chunk_overlap: int = 120
     rag_top_k: int = 5
+    mcp_enabled: bool = False
+    mcp_config_path: str = str(ROOT_DIR / "storage" / "mcp_servers.json")
 
     @property
     def http_allowlist_prefixes(self) -> list[str]:
@@ -146,6 +148,13 @@ class Settings(BaseSettings):
     @property
     def resolved_embedding_api_key(self) -> str:
         return self.embedding_api_key or self.llm_api_key or ""
+
+    @property
+    def mcp_config_file(self) -> Path:
+        path = Path(self.mcp_config_path)
+        if not path.is_absolute():
+            path = ROOT_DIR / path
+        return path
 
 
 def _load_overrides() -> dict[str, Any]:
