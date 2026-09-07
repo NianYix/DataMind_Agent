@@ -81,3 +81,4 @@ class AgentState(BaseModel):
     output_tokens: int = 0
     estimated_cost: float | None = None
     used_non_python_tool: bool = False
+    datasets: list[dict[str, Any]] = Field(default_factory=list)

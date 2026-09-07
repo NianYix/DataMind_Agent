@@ -92,6 +92,7 @@ def _ctx(state: GraphState) -> ToolContext:
         run_id=state.get("run_id"),
         connection_id=state.get("connection_id"),
         workspace_id=state.get("workspace_id"),
+        sources=list(state.get("datasets") or []),
     )
 
 
@@ -153,6 +154,11 @@ def plan_node(state: GraphState, config: RunnableConfig) -> dict[str, Any]:
         "profile_summary": state.get("profile_summary"),
         "schema": state.get("schema_info"),
         "memory": state.get("memory") or {},
+        "datasets": [
+            {"alias": d.get("alias"), "name": d.get("name"), "rows": d.get("row_count"), "cols": d.get("col_count")}
+            for d in (state.get("datasets") or [])
+        ]
+        or None,
     }
     try:
         structured = model.with_structured_output(PlanOut)

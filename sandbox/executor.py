@@ -13,11 +13,27 @@ from sandbox.security import SecurityError, validate_code
 from server.core.config import get_settings
 
 
+def _load_frame_snippet(var_name: str, path_repr: str) -> str:
+    return textwrap.dedent(
+        f"""
+        _p = Path({path_repr})
+        if _p.suffix.lower() == '.csv':
+            {var_name} = pd.read_csv(_p)
+        else:
+            {var_name} = pd.read_excel(_p)
+        for col in {var_name}.columns:
+            if 'date' in str(col).lower() or 'time' in str(col).lower():
+                {var_name}[col] = pd.to_datetime({var_name}[col], errors='coerce')
+        """
+    )
+
+
 def execute_python(
     code: str,
     dataset_path: str,
     *,
     timeout_sec: int | None = None,
+    sources: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     settings = get_settings()
     timeout = timeout_sec or settings.tool_timeout_sec
@@ -34,21 +50,33 @@ def execute_python(
             "duration_ms": int((time.perf_counter() - started) * 1000),
         }
 
+    srcs = list(sources or [])
+    if not srcs:
+        srcs = [{"alias": "data", "frame": "df", "path": dataset_path}]
+
+    load_blocks: list[str] = []
+    for s in srcs:
+        frame = str(s.get("frame") or ("df" if s.get("alias") == "data" else f"df_{str(s.get('alias','')).replace('data_','')}"))
+        path = str(s.get("path") or dataset_path)
+        load_blocks.append(_load_frame_snippet(frame, repr(path)))
+
+    # Ensure primary alias `df` exists
+    frames = [str(s.get("frame") or "df") for s in srcs]
+    if "df" not in frames and frames:
+        load_blocks.append(f"df = {frames[0]}\n")
+
+    dfs_map = ", ".join(
+        f"{str(s.get('alias') or 'data')!r}: {str(s.get('frame') or 'df')}" for s in srcs
+    )
+
     runner = textwrap.dedent(
         f"""
         import json
         import pandas as pd
         from pathlib import Path
 
-        path = Path({dataset_path!r})
-        if path.suffix.lower() == '.csv':
-            df = pd.read_csv(path)
-        else:
-            df = pd.read_excel(path)
-
-        for col in df.columns:
-            if 'date' in str(col).lower() or 'time' in str(col).lower():
-                df[col] = pd.to_datetime(df[col], errors='coerce')
+{textwrap.indent(''.join(load_blocks), '        ')}
+        dfs = {{{dfs_map}}}
 
         result = None
         stdout_lines = []

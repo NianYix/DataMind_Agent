@@ -83,6 +83,7 @@ class AgentRuntime:
             table_name=state.table_name,
             profile=state.schema_info if state.schema_info.get("fields") else None,
             run_id=state.run_id,
+            sources=list(getattr(state, "datasets", None) or []),
         )
 
         audit_service.record(

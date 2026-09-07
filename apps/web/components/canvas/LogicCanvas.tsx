@@ -1,6 +1,15 @@
 "use client";
 
-import { FLOW_NODE_SIZE, FlowEdgeModel, FlowNodeModel, kindColor } from "@/lib/flowModel";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FLOW_NODE_SIZE,
+  FlowEdgeModel,
+  FlowNodeModel,
+  canvasBounds,
+  kindColor,
+} from "@/lib/flowModel";
+
+const DRAG_THRESHOLD = 8;
 
 export function FlowEdge({
   edge,
@@ -35,19 +44,29 @@ export function FlowEdge({
 export function FlowNode({
   node,
   selected,
-  onSelect,
+  dragging,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
 }: {
   node: FlowNodeModel;
   selected: boolean;
-  onSelect: (id: string) => void;
+  dragging: boolean;
+  onPointerDown: (id: string, e: React.PointerEvent<HTMLButtonElement>) => void;
+  onPointerMove: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => void;
 }) {
   const accent = kindColor(node.kind);
+
   return (
     <button
       type="button"
-      onClick={() => onSelect(node.id)}
-      className={`absolute text-left transition-colors duration-150 ${
-        node.status === "running" ? "node-running" : ""
+      onPointerDown={(e) => onPointerDown(node.id, e)}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      className={`absolute touch-none select-none text-left ${node.status === "running" ? "node-running" : ""} ${
+        dragging ? "z-10 cursor-grabbing" : "cursor-grab"
       }`}
       style={{
         left: node.x,
@@ -55,9 +74,10 @@ export function FlowNode({
         width: FLOW_NODE_SIZE.w,
         height: FLOW_NODE_SIZE.h,
       }}
+      title={node.summary || undefined}
     >
       <div
-        className="h-full overflow-hidden rounded-md border bg-[var(--panel)] px-2.5 py-2"
+        className="pointer-events-none h-full overflow-hidden rounded-md border bg-[var(--panel)] px-2.5 py-2"
         style={{
           borderColor: selected ? "var(--primary)" : accent,
           boxShadow: selected
@@ -89,6 +109,7 @@ export function LogicCanvas({
   width,
   height,
   selectedId,
+  layoutKey,
   onSelect,
 }: {
   nodes: FlowNodeModel[];
@@ -96,18 +117,110 @@ export function LogicCanvas({
   width: number;
   height: number;
   selectedId: string | null;
+  /** Reset drag offsets when Run / trace identity changes */
+  layoutKey?: string | null;
   onSelect: (id: string) => void;
 }) {
+  const [overlays, setOverlays] = useState<Record<string, { x: number; y: number }>>({});
+  const dragRef = useRef<{
+    id: string;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    moved: boolean;
+  } | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const displayRef = useRef<FlowNodeModel[]>([]);
+
+  useEffect(() => {
+    setOverlays({});
+  }, [layoutKey]);
+
+  const displayNodes = useMemo(
+    () =>
+      nodes.map((n) => {
+        const o = overlays[n.id];
+        return o ? { ...n, x: o.x, y: o.y } : n;
+      }),
+    [nodes, overlays],
+  );
+  displayRef.current = displayNodes;
+
+  const bounds = useMemo(() => {
+    const b = canvasBounds(displayNodes);
+    return {
+      width: Math.max(b.width, width, 480),
+      height: Math.max(b.height, height, 320),
+    };
+  }, [displayNodes, width, height]);
+
+  const endDrag = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      const d = dragRef.current;
+      if (!d || e.pointerId !== d.pointerId) return;
+      const moved = d.moved;
+      const id = d.id;
+      dragRef.current = null;
+      setDraggingId(null);
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      if (!moved) onSelect(id);
+    },
+    [onSelect],
+  );
+
+  const onNodePointerDown = useCallback((id: string, e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    const node = displayRef.current.find((n) => n.id === id);
+    if (!node) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = {
+      id,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: node.x,
+      originY: node.y,
+      moved: false,
+    };
+    setDraggingId(id);
+  }, []);
+
+  const onNodePointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    const d = dragRef.current;
+    if (!d || e.pointerId !== d.pointerId) return;
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    d.moved = true;
+    const x = Math.max(8, d.originX + dx);
+    const y = Math.max(8, d.originY + dy);
+    setOverlays((prev) => ({ ...prev, [d.id]: { x, y } }));
+  }, []);
+
   return (
-    <div className="canvas-grid relative h-full min-h-0 overflow-auto">
-      <div className="relative" style={{ width: Math.max(width, 480), height: Math.max(height, 320) }}>
-        <svg className="pointer-events-none absolute inset-0" width={width} height={height}>
-          {edges.map((e) => (
-            <FlowEdge key={e.id} edge={e} nodes={nodes} />
+    <div className="canvas-grid relative h-full min-h-0 w-full overflow-auto">
+      <div className="relative" style={{ width: bounds.width, height: bounds.height }}>
+        <svg className="pointer-events-none absolute inset-0" width={bounds.width} height={bounds.height}>
+          {edges.map((ed) => (
+            <FlowEdge key={ed.id} edge={ed} nodes={displayNodes} />
           ))}
         </svg>
-        {nodes.map((n) => (
-          <FlowNode key={n.id} node={n} selected={selectedId === n.id} onSelect={onSelect} />
+        {displayNodes.map((n) => (
+          <FlowNode
+            key={n.id}
+            node={n}
+            selected={selectedId === n.id}
+            dragging={draggingId === n.id}
+            onPointerDown={onNodePointerDown}
+            onPointerMove={onNodePointerMove}
+            onPointerUp={endDrag}
+          />
         ))}
       </div>
     </div>

@@ -25,7 +25,8 @@ export default function HomePage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspaceId, setWorkspaceId] = useState("");
   const [datasets, setDatasets] = useState<Dataset[]>([]);
-  const [datasetId, setDatasetId] = useState("");
+  const [datasetIds, setDatasetIds] = useState<string[]>([]);
+  const [primaryDatasetId, setPrimaryDatasetId] = useState("");
   const [dataset, setDataset] = useState<Dataset | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [conversationId, setConversationId] = useState("");
@@ -45,11 +46,22 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [health, setHealth] = useState("checking");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [nodeFocusKey, setNodeFocusKey] = useState(0);
   const [collaboration, setCollaboration] = useState<import("@/components/inspector/Inspector").CollaborationInfo | null>(null);
 
+  const selectNode = useCallback((id: string) => {
+    setSelectedNodeId(id);
+    setNodeFocusKey((k) => k + 1);
+  }, []);
+
   const selectedDataset = useMemo(
-    () => datasets.find((d) => d.id === datasetId) || dataset,
-    [datasets, datasetId, dataset],
+    () => datasets.find((d) => d.id === primaryDatasetId) || dataset,
+    [datasets, primaryDatasetId, dataset],
+  );
+
+  const boundDatasets = useMemo(
+    () => datasetIds.map((id) => datasets.find((d) => d.id === id)).filter(Boolean) as Dataset[],
+    [datasetIds, datasets],
   );
 
   const traceItems: TraceItem[] = useMemo(() => {
@@ -57,6 +69,9 @@ export default function HomePage() {
       return steps.map((s) => ({
         type: s.agent_name,
         summary: s.output_summary || s.input_summary || "",
+        inputSummary: s.input_summary || undefined,
+        outputSummary: s.output_summary || undefined,
+        stepStatus: s.status,
       }));
     }
     return liveTrace;
@@ -92,9 +107,19 @@ export default function HomePage() {
       setDatasets(ds);
       setConversations(convs);
       setRuns(runList);
-      if (ds.length && !datasetId) setDatasetId(ds[0].id);
+      setDatasetIds((prev) => {
+        if (prev.length) {
+          const keep = prev.filter((id) => ds.some((d) => d.id === id));
+          if (keep.length) return keep;
+        }
+        return ds[0] ? [ds[0].id] : [];
+      });
+      setPrimaryDatasetId((prev) => {
+        if (prev && ds.some((d) => d.id === prev)) return prev;
+        return ds[0]?.id || "";
+      });
     },
-    [datasetId],
+    [],
   );
 
   useEffect(() => {
@@ -116,9 +141,30 @@ export default function HomePage() {
   }, [refreshWorkspace]);
 
   useEffect(() => {
-    if (!datasetId) return;
-    api.dataset(datasetId).then(setDataset).catch(() => setDataset(null));
-  }, [datasetId]);
+    if (!primaryDatasetId) return;
+    api.dataset(primaryDatasetId).then(setDataset).catch(() => setDataset(null));
+  }, [primaryDatasetId]);
+
+  const toggleDataset = useCallback((id: string) => {
+    setConversationId("");
+    setDatasetIds((prev) => {
+      if (prev.includes(id)) {
+        if (prev.length <= 1) return prev;
+        const next = prev.filter((x) => x !== id);
+        setPrimaryDatasetId((p) => (p === id ? next[0] : p));
+        return next;
+      }
+      if (prev.length >= 5) return prev;
+      return prev.length ? [...prev, id] : [id];
+    });
+    setPrimaryDatasetId((p) => p || id);
+  }, []);
+
+  const setPrimaryDataset = useCallback((id: string) => {
+    setConversationId("");
+    setPrimaryDatasetId(id);
+    setDatasetIds((prev) => (prev.includes(id) ? [id, ...prev.filter((x) => x !== id)] : [id, ...prev]));
+  }, []);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -165,7 +211,7 @@ export default function HomePage() {
     try {
       const ds = await api.uploadDataset(workspaceId, file);
       await refreshWorkspace(workspaceId);
-      setDatasetId(ds.id);
+      setPrimaryDataset(ds.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     }
@@ -177,7 +223,7 @@ export default function HomePage() {
     try {
       const ds = await api.uploadSqlite(workspaceId, file, sqliteTable || "sales");
       await refreshWorkspace(workspaceId);
-      setDatasetId(ds.id);
+      setPrimaryDataset(ds.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "SQLite upload failed");
     }
@@ -185,8 +231,11 @@ export default function HomePage() {
 
   async function ensureConversation() {
     if (conversationId) return conversationId;
-    if (!workspaceId || !datasetId) throw new Error("请先选择数据集");
-    const conv = await api.createConversation(workspaceId, datasetId);
+    if (!workspaceId || !primaryDatasetId || !datasetIds.length) throw new Error("请先选择数据集");
+    const conv = await api.createConversation(workspaceId, {
+      datasetIds,
+      primaryDatasetId,
+    });
     setConversationId(conv.id);
     setConversations((prev) => [conv, ...prev]);
     return conv.id;
@@ -319,22 +368,21 @@ export default function HomePage() {
           onRun={() => onAsk()}
           onStop={onCancel}
           running={running}
-          canRun={Boolean(datasetId && input.trim())}
+          canRun={Boolean(primaryDatasetId && datasetIds.length && input.trim())}
         />
       }
     >
-      <div className="grid h-full min-h-0 grid-rows-[1fr_auto]">
-        <div className="grid min-h-0 grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)_320px]">
-          <div className="min-h-0 md:block">
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div className="h-full w-[280px] shrink-0 overflow-hidden">
             <AgentPanel
               runStatus={runStatus}
               latestSummary={latestSummary}
               datasets={datasets}
-              datasetId={datasetId}
-              onSelectDataset={(id) => {
-                setDatasetId(id);
-                setConversationId("");
-              }}
+              datasetIds={datasetIds}
+              primaryDatasetId={primaryDatasetId}
+              onToggleDataset={toggleDataset}
+              onSetPrimaryDataset={setPrimaryDataset}
               onUpload={onUpload}
               onUploadSqlite={onUploadSqlite}
               sqliteTable={sqliteTable}
@@ -354,7 +402,7 @@ export default function HomePage() {
             />
           </div>
 
-          <section className="flex min-h-0 min-w-0 flex-col border-x border-[var(--border)] bg-[var(--bg-1)]">
+          <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-x border-[var(--border)] bg-[var(--bg-1)]">
             <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-3 py-2">
               <div>
                 <div className="text-xs font-medium text-[var(--text)]">Logic Canvas</div>
@@ -363,22 +411,26 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-            <div className="min-h-0 flex-1">
+            <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
               <LogicCanvas
                 nodes={graph.nodes}
                 edges={graph.edges}
                 width={graph.width}
                 height={graph.height}
                 selectedId={selectedNodeId}
-                onSelect={setSelectedNodeId}
+                layoutKey={runId || (running ? "live" : "idle")}
+                onSelect={selectNode}
               />
             </div>
           </section>
 
-          <div className="min-h-0">
+          <div className="flex h-full w-[320px] shrink-0 flex-col overflow-hidden border-l border-[var(--border)] bg-[var(--panel)]">
             <Inspector
               dataset={selectedDataset}
+              boundDatasets={boundDatasets}
+              primaryDatasetId={primaryDatasetId}
               selectedNode={selectedNode}
+              nodeFocusKey={nodeFocusKey}
               evidences={evidences}
               evidence={evidence}
               onSelectEvidence={setEvidence}

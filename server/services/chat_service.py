@@ -22,20 +22,46 @@ from server.models import (
     Message,
     Report,
 )
+from server.services.dataset_binding import (
+    assert_sources_sandboxable,
+    conversation_binding_fields,
+    format_datasets_prompt,
+    resolve_binding,
+    sources_to_dicts,
+)
 from server.services.dataset_service import get_dataset
 from server.services.report_export import markdown_to_pdf
 from tools.statistics import _load_df
 
 
-def create_conversation(db: Session, workspace_id: str, dataset_id: str, title: str | None = None) -> Conversation:
-    ds = get_dataset(db, dataset_id)
-    if ds.workspace_id != workspace_id:
-        raise HTTPException(status_code=400, detail="Dataset not in workspace")
+def create_conversation(
+    db: Session,
+    workspace_id: str,
+    *,
+    dataset_id: str | None = None,
+    dataset_ids: list[str] | None = None,
+    primary_dataset_id: str | None = None,
+    title: str | None = None,
+) -> Conversation:
+    binding = resolve_binding(
+        db,
+        workspace_id,
+        dataset_id=dataset_id,
+        dataset_ids=dataset_ids,
+        primary_dataset_id=primary_dataset_id,
+    )
+    primary = next(s for s in binding.sources if s.id == binding.primary_id)
+    assert_sources_sandboxable(binding.sources)
     conv = Conversation(
         workspace_id=workspace_id,
-        dataset_id=dataset_id,
-        title=title or f"分析 · {ds.name}",
-        context_json={"dataset_id": dataset_id, "filters": {}},
+        dataset_id=binding.primary_id,
+        title=title or f"分析 · {primary.name}",
+        context_json={
+            "dataset_id": binding.primary_id,
+            "dataset_ids": binding.dataset_ids,
+            "primary_dataset_id": binding.primary_id,
+            "filters": {},
+        },
     )
     db.add(conv)
     db.commit()
@@ -73,30 +99,47 @@ def stream_analysis(db: Session, conversation_id: str, content: str) -> Iterator
     db.commit()
 
     context = dict(conv.context_json or {"dataset_id": conv.dataset_id, "filters": {}})
+    ids, _primary = conversation_binding_fields(conv)
+    if "dataset_ids" not in context:
+        context["dataset_ids"] = ids
+        context["primary_dataset_id"] = conv.dataset_id
     gateway = get_llm_gateway()
     context, mem_in, mem_out = refresh_conversation_memory(gateway, context, content)
     conv.context_json = context
     db.commit()
 
-    ds = get_dataset(db, conv.dataset_id)
-    profile = ds.profile_json or {}
+    binding = resolve_binding(
+        db,
+        conv.workspace_id,
+        dataset_ids=ids or [conv.dataset_id],
+        primary_dataset_id=conv.dataset_id,
+    )
+    assert_sources_sandboxable(binding.sources)
+    primary = binding.sources[0]
+    profile = primary.profile or {}
+    multi_prompt = format_datasets_prompt(binding.sources)
+    profile_summary = str(profile.get("summary_text") or "")
+    if multi_prompt:
+        profile_summary = (profile_summary + "\n\n" + multi_prompt).strip()
+
     run_id = str(uuid.uuid4())
 
     state = AgentState(
         run_id=run_id,
         conversation_id=conversation_id,
         question=content,
-        dataset_id=ds.id,
-        dataset_path=ds.file_path,
-        source_type=getattr(ds, "source_type", None) or "file",
-        table_name=getattr(ds, "table_name", None),
-        connection_id=getattr(ds, "connection_id", None),
+        dataset_id=primary.id,
+        dataset_path=primary.path,
+        source_type=primary.source_type,
+        table_name=primary.table_name,
+        connection_id=primary.connection_id,
         workspace_id=conv.workspace_id,
         schema_info=profile if profile.get("fields") else {},
-        profile_summary=str(profile.get("summary_text") or ""),
+        profile_summary=profile_summary,
         memory=context.get("filters") or {},
         input_tokens=mem_in,
         output_tokens=mem_out,
+        datasets=sources_to_dicts(binding.sources),
     )
 
     runtime = create_runtime(db)

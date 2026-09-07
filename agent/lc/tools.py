@@ -12,14 +12,23 @@ from tools.registry import ToolContext, run_tool
 
 class PreviewInput(BaseModel):
     n: int = Field(default=5, description="Number of preview rows")
+    alias: str | None = Field(default=None, description="Optional table alias: data, data_2, …")
 
 
 class PythonInput(BaseModel):
-    code: str = Field(description="Pandas code. df is preloaded. Assign output to result.")
+    code: str = Field(
+        description="Pandas code. Primary frame is df; additional frames df_2… when multi-dataset. Assign output to result."
+    )
 
 
 class SqlInput(BaseModel):
-    sql: str = Field(description="Readonly SQL against table `data`")
+    sql: str = Field(
+        description="Readonly SQL. Primary table is `data`; additional tables `data_2`… when multi-dataset (JOIN allowed)."
+    )
+
+
+class SchemaInput(BaseModel):
+    alias: str | None = Field(default=None, description="Optional table alias: data, data_2, …")
 
 
 class StatsInput(BaseModel):
@@ -64,11 +73,14 @@ def _dumps(payload: dict[str, Any]) -> str:
 
 
 def build_tools(ctx: ToolContext) -> list[StructuredTool]:
-    def dataset_schema() -> str:
-        return _dumps(run_tool("dataset_schema", {}, ctx))
+    def dataset_schema(alias: str | None = None) -> str:
+        return _dumps(run_tool("dataset_schema", {"alias": alias} if alias else {}, ctx))
 
-    def dataset_preview(n: int = 5) -> str:
-        return _dumps(run_tool("dataset_preview", {"n": n}, ctx))
+    def dataset_preview(n: int = 5, alias: str | None = None) -> str:
+        args: dict[str, Any] = {"n": n}
+        if alias:
+            args["alias"] = alias
+        return _dumps(run_tool("dataset_preview", args, ctx))
 
     def python_execute(code: str) -> str:
         return _dumps(run_tool("python_execute", {"code": code}, ctx))
@@ -126,10 +138,30 @@ def build_tools(ctx: ToolContext) -> list[StructuredTool]:
         )
 
     tools = [
-        StructuredTool.from_function(func=dataset_schema, name="dataset_schema", description="Get dataset field names and types"),
-        StructuredTool.from_function(func=dataset_preview, name="dataset_preview", description="Preview first N rows", args_schema=PreviewInput),
-        StructuredTool.from_function(func=python_execute, name="python_execute", description="Execute Pandas code on dataframe df", args_schema=PythonInput),
-        StructuredTool.from_function(func=sql_query, name="sql_query", description="Run readonly SQL against table data", args_schema=SqlInput),
+        StructuredTool.from_function(
+            func=dataset_schema,
+            name="dataset_schema",
+            description="Get field names and types for data / data_2… (optional alias)",
+            args_schema=SchemaInput,
+        ),
+        StructuredTool.from_function(
+            func=dataset_preview,
+            name="dataset_preview",
+            description="Preview first N rows (optional alias data_2…)",
+            args_schema=PreviewInput,
+        ),
+        StructuredTool.from_function(
+            func=python_execute,
+            name="python_execute",
+            description="Execute Pandas on df / df_2…; assign output to result",
+            args_schema=PythonInput,
+        ),
+        StructuredTool.from_function(
+            func=sql_query,
+            name="sql_query",
+            description="Readonly SQL on data / data_2… (JOIN allowed when multi-dataset)",
+            args_schema=SqlInput,
+        ),
         StructuredTool.from_function(func=statistics, name="statistics", description="Describe statistics for a column, optionally grouped", args_schema=StatsInput),
         StructuredTool.from_function(func=anomaly_detection, name="anomaly_detection", description="Detect numeric outliers with IQR", args_schema=AnomalyInput),
         StructuredTool.from_function(func=generate_chart, name="generate_chart", description="Build an ECharts option JSON", args_schema=ChartInput),

@@ -69,7 +69,7 @@ def test_workflow_api_mock_run(monkeypatch):
     assert all(s["status"] == "done" for s in steps)
 
     health = client.get("/api/health").json()
-    assert health["version"] == "0.9.0"
+    assert health["version"] == "0.10.0"
 
 
 def test_workflow_condition_branch_mock(monkeypatch):

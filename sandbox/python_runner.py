@@ -32,6 +32,7 @@ def run_python(
     timeout_sec: int | None = None,
     run_id: str | None = None,
     memory_mb: int | None = None,
+    sources: list[dict] | None = None,
 ) -> dict[str, Any]:
     mem_status = "skipped"
     if memory_mb:
@@ -39,7 +40,7 @@ def run_python(
         if mem_status == "unsupported":
             logger.info("run_id=%s memory_limit=unsupported", run_id)
 
-    raw = execute_python(code, dataset_path, timeout_sec=timeout_sec)
+    raw = execute_python(code, dataset_path, timeout_sec=timeout_sec, sources=sources)
     error = raw.get("error")
     success = bool(raw.get("success"))
     error_code: str | None = None

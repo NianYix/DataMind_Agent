@@ -58,6 +58,9 @@ export type Conversation = {
   workspace_id: string;
   dataset_id: string | null;
   title: string;
+  dataset_ids?: string[];
+  primary_dataset_id?: string | null;
+  context_json?: Record<string, unknown> | null;
 };
 export type Message = {
   id: string;
@@ -172,12 +175,25 @@ export const api = {
   },
   conversations: (workspaceId: string) =>
     request<Conversation[]>(`/api/workspaces/${workspaceId}/conversations`),
-  createConversation: (workspaceId: string, datasetId: string, title?: string) =>
-    request<Conversation>(`/api/workspaces/${workspaceId}/conversations`, {
+  createConversation: (
+    workspaceId: string,
+    datasetIdOrOpts: string | { datasetIds: string[]; primaryDatasetId?: string; title?: string },
+    title?: string,
+  ) => {
+    const body =
+      typeof datasetIdOrOpts === "string"
+        ? { dataset_id: datasetIdOrOpts, title }
+        : {
+            dataset_ids: datasetIdOrOpts.datasetIds,
+            primary_dataset_id: datasetIdOrOpts.primaryDatasetId || datasetIdOrOpts.datasetIds[0],
+            title: datasetIdOrOpts.title ?? title,
+          };
+    return request<Conversation>(`/api/workspaces/${workspaceId}/conversations`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataset_id: datasetId, title }),
-    }),
+      body: JSON.stringify(body),
+    });
+  },
   messages: (conversationId: string) =>
     request<Message[]>(`/api/conversations/${conversationId}/messages`),
   workspaceRuns: (workspaceId: string) =>

@@ -43,3 +43,4 @@ class GraphState(TypedDict, total=False):
     agents_involved: list[str]
     last_agent: str | None
     critic_result: dict[str, Any] | None
+    datasets: list[dict[str, Any]]

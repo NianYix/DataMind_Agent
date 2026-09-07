@@ -25,12 +25,20 @@ router = APIRouter(prefix="/api", tags=["analysis"])
 
 @router.post("/workspaces/{workspace_id}/conversations", response_model=ConversationOut)
 def create_conversation(workspace_id: str, body: ConversationCreate, db: Session = Depends(get_db)):
-    return chat_service.create_conversation(db, workspace_id, body.dataset_id, body.title)
+    conv = chat_service.create_conversation(
+        db,
+        workspace_id,
+        dataset_id=body.dataset_id,
+        dataset_ids=body.dataset_ids,
+        primary_dataset_id=body.primary_dataset_id,
+        title=body.title,
+    )
+    return ConversationOut.from_orm_conv(conv)
 
 
 @router.get("/workspaces/{workspace_id}/conversations", response_model=list[ConversationOut])
 def list_conversations(workspace_id: str, db: Session = Depends(get_db)):
-    return chat_service.list_conversations(db, workspace_id)
+    return [ConversationOut.from_orm_conv(c) for c in chat_service.list_conversations(db, workspace_id)]
 
 
 @router.get("/conversations/{conversation_id}/messages", response_model=list[MessageOut])

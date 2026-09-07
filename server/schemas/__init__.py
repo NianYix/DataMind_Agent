@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class WorkspaceCreate(BaseModel):
@@ -46,8 +46,16 @@ class DatasetOut(BaseModel):
 
 
 class ConversationCreate(BaseModel):
-    dataset_id: str
+    dataset_id: str | None = None
+    dataset_ids: list[str] | None = None
+    primary_dataset_id: str | None = None
     title: str | None = None
+
+    @model_validator(mode="after")
+    def require_dataset(self) -> ConversationCreate:
+        if not self.dataset_id and not self.dataset_ids:
+            raise ValueError("dataset_id or dataset_ids is required")
+        return self
 
 
 class ConversationOut(BaseModel):
@@ -57,8 +65,26 @@ class ConversationOut(BaseModel):
     title: str
     context_json: dict[str, Any] | None = None
     created_at: datetime | None = None
+    dataset_ids: list[str] = Field(default_factory=list)
+    primary_dataset_id: str | None = None
 
     model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_orm_conv(cls, conv: Any) -> ConversationOut:
+        from server.services.dataset_binding import conversation_binding_fields
+
+        ids, primary = conversation_binding_fields(conv)
+        return cls(
+            id=conv.id,
+            workspace_id=conv.workspace_id,
+            dataset_id=conv.dataset_id,
+            title=conv.title,
+            context_json=conv.context_json,
+            created_at=getattr(conv, "created_at", None),
+            dataset_ids=ids,
+            primary_dataset_id=primary or conv.dataset_id,
+        )
 
 
 class MessageCreate(BaseModel):

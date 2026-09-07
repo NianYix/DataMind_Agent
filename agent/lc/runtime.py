@@ -67,6 +67,7 @@ class LangGraphAgentRuntime:
             "agents_involved": [],
             "last_agent": None,
             "critic_result": None,
+            "datasets": list(getattr(state, "datasets", None) or []),
         }
 
         config = {

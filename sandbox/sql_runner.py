@@ -20,6 +20,7 @@ def run_sql(
     run_id: str | None = None,
     max_rows: int | None = None,
     connection_id: str | None = None,
+    sources: list | None = None,
 ) -> dict[str, Any]:
     settings = get_settings()
     limit = max_rows or settings.sql_max_rows
@@ -42,6 +43,7 @@ def run_sql(
         source_type=source_type,
         table_name=table_name,
         connection_id=connection_id,
+        sources=sources,
     )
     if not out.get("success"):
         err = str(out.get("error") or "sql failed")

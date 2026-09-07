@@ -55,11 +55,27 @@ cd apps/web && pnpm install && pnpm dev
 **使用**：
 
 1. 打开 `/`，上传 CSV/Excel 或选已有 Dataset（也可挂 SQLite / 远程表）。  
-2. 输入问题（如「为什么 8 月销售下降？」）→ **Run**。  
-3. 左侧看对话与计划；中间 Canvas 看 Trace；右侧 Inspector 看 Context / Evidence / Charts / Report / **Agents**。  
-4. 需要停跑时点 **Stop**。
+2. **可多选 Dataset**（勾选 +「设为主」）：同一次提问联合多表；SQL 用 `data` / `data_2`…，Python 用 `df` / `df_2`…。  
+3. 输入问题（如「为什么 8 月销售下降？」）→ **Run**。  
+4. 左侧看对话与计划；中间 Canvas 看 Trace；右侧 Inspector 看 Context（绑定主/辅表）/ Evidence / Charts / Report / **Agents**。  
+5. 需要停跑时点 **Stop**。
 
-### 2. Multi-Agent 协作（V8）
+### 2. Multi-Dataset 同 Run（V10）
+
+**意义**：Workspace 里多个已上传文件可在一次分析中对比或 JOIN，不必先外部合并。
+
+**使用**：
+
+1. Datasets 列表勾选 1–5 个表，点「设为主」指定 primary（默认 `data` / `df`）。  
+2. 改选集合会新建会话（不改写历史 Run）。  
+3. 提问即可；Inspector → Context 可见主/辅绑定。  
+4. 上限：`MAX_DATASETS_PER_CONVERSATION=5`（默认）。远程多源本阶段不支持，请用 CSV/Excel/SQLite。
+
+```bash
+MAX_DATASETS_PER_CONVERSATION=5
+```
+
+### 3. Multi-Agent 协作（V8）
 
 **意义**：一次分析由 Planner / Supervisor / Tools / Analyst / Insight / Report（可选 Critic）接力；交接与黑板可回看，便于审计「谁做了什么、依据是什么」。
 
@@ -75,7 +91,7 @@ MULTI_AGENT_ENABLED=true
 CRITIC_ENABLED=false
 ```
 
-### 3. AI Workflow（V9）
+### 4. AI Workflow（V9）
 
 **意义**：把重复分析固化成可保存、可复跑的流程（绑定问题/数据 → analyze → 可选条件分支），适合周报归因、固定口径复检，而不必每次从零对话。
 
@@ -93,7 +109,7 @@ WORKFLOW_TIMEOUT_SEC=600
 
 API：`GET /api/workflow-templates`、`POST /api/workflows`、`POST /api/workflows/{id}/runs`。
 
-### 4. MCP 集成（V7）
+### 5. MCP 集成（V7）
 
 **意义**：让 Agent 调用外部 MCP Server 工具（扩展能力），也可把 DataMind 只读能力以 MCP Server 形式暴露给 Cursor 等宿主。
 
@@ -118,7 +134,7 @@ MCP_ENABLED=false
 MCP_CONFIG_PATH=./storage/mcp_servers.json
 ```
 
-### 5. RAG 知识库（V6）
+### 6. RAG 知识库（V6）
 
 **意义**：把口径、制度、指标定义等文档入库；问「华东口径包含哪些省市」时走检索，而不是只靠模型记忆，减少幻觉。
 
@@ -135,7 +151,7 @@ CHROMA_PATH=./storage/chroma
 KNOWLEDGE_DIR=./storage/knowledge
 ```
 
-### 6. 企业切片（V5）
+### 7. 企业切片（V5）
 
 **意义**：对接真实库表、版本化系统提示词、受控 HTTP 工具与可选登录，便于从「本地 CSV Demo」过渡到团队试用。
 
@@ -154,7 +170,7 @@ HTTP_URL_ALLOWLIST=https://httpbin.org/,https://api.github.com/
 WEB_SEARCH_ENABLED=false
 ```
 
-### 7. Evaluation（V4）
+### 8. Evaluation（V4）
 
 **意义**：用固定 Suite 回归「分析质量与工具成功率」，区分 mock（CI）与 live（真 LLM），避免改 Agent 后无感知退化。
 
@@ -167,7 +183,7 @@ python -m evaluation --suite sales_suite --mode mock
 
 或打开 `/evaluation` 选择 suite / mode 启动。详见下文「Evaluation」一节。
 
-### 8. Settings / Metrics
+### 9. Settings / Metrics
 
 **意义**：热调模型与超时等运维参数，并查看 Run/工具成功率，方便排障。
 
@@ -176,6 +192,15 @@ python -m evaluation --suite sales_suite --mode mock
 ---
 
 ## 版本能力速查（配置表）
+
+### V10 Multi-Dataset
+
+| 能力 | 说明 |
+|------|------|
+| 绑定 | `dataset_ids` + primary（`Conversation.dataset_id`） |
+| SQL / Python | `data`/`data_2`… · `df`/`df_2`… |
+| 上限 | `MAX_DATASETS_PER_CONVERSATION`（默认 5） |
+| UI | Workspace 多选 + 主表；Inspector Context |
 
 ### V9 AI Workflow
 
@@ -296,8 +321,11 @@ Suite 定义：`evaluation/datasets/sales_suite.json`。
 | V7 MCP | `specs/v7/` |
 | V8 Multi-Agent | `specs/v8/` |
 | V9 Workflow | `specs/v9/` |
+| V10 Multi-Dataset | `specs/v10/` |
 
 需求 / 设计 / 任务均在对应目录的 `requirements.md` · `design.md` · `tasks.md`。
+
+未立项想法见 **需求池**：[`specs/backlog.md`](specs/backlog.md)。
 
 ---
 

@@ -122,4 +122,4 @@ def test_collaboration_api(monkeypatch):
     assert "critic_enabled" in settings
 
     health = client.get("/api/health").json()
-    assert health["version"] == "0.9.0"
+    assert health["version"] == "0.10.0"

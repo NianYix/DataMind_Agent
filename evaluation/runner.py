@@ -129,7 +129,7 @@ def _run_case(db: Session, eval_run_id: str, case: dict[str, Any], *, mode: str)
     try:
         ds = _ensure_dataset(db, str(case.get("dataset")))
         ws = ensure_default_workspace(db)
-        conv = create_conversation(db, ws.id, ds.id, title=f"eval:{case_id}")
+        conv = create_conversation(db, ws.id, dataset_id=ds.id, title=f"eval:{case_id}")
         run_id = str(uuid.uuid4())
         state = AgentState(
             run_id=run_id,

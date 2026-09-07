@@ -87,6 +87,7 @@ class Settings(BaseSettings):
     critic_enabled: bool = False
     workflow_mock_analyze: bool = False
     workflow_timeout_sec: int = 600
+    max_datasets_per_conversation: int = 5
 
     @property
     def http_allowlist_prefixes(self) -> list[str]:

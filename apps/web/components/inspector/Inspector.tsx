@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChartView } from "@/components/ChartView";
 import { ChartItem, Dataset, Evidence } from "@/lib/api";
 import { FlowNodeModel } from "@/lib/flowModel";
 import { api } from "@/lib/api";
+import { Tip } from "@/components/shell/Tip";
 
 export type CollaborationInfo = {
   enabled: boolean;
@@ -23,9 +24,21 @@ export type CollaborationInfo = {
 
 type Tab = "context" | "node" | "agents" | "evidence" | "charts" | "report";
 
+const TAB_TIPS: Record<Tab, string> = {
+  context: "当前数据集画像与字段概览",
+  node: "Canvas 中选中节点的详情",
+  agents: "Multi-Agent：参与角色、交接、黑板与 Critic",
+  evidence: "工具结果支撑的证据链（claim + 预览）",
+  charts: "本轮分析生成的图表",
+  report: "Markdown 分析报告（可导出 PDF）",
+};
+
 export function Inspector({
   dataset,
+  boundDatasets = [],
+  primaryDatasetId,
   selectedNode,
+  nodeFocusKey = 0,
   evidences,
   evidence,
   onSelectEvidence,
@@ -35,7 +48,11 @@ export function Inspector({
   collaboration,
 }: {
   dataset: Dataset | null;
+  boundDatasets?: Dataset[];
+  primaryDatasetId?: string;
   selectedNode: FlowNodeModel | null;
+  /** Bumped on every Canvas node select so Node tab opens even when re-clicking the same id */
+  nodeFocusKey?: number;
   evidences: Evidence[];
   evidence: Evidence | null;
   onSelectEvidence: (ev: Evidence) => void;
@@ -45,6 +62,10 @@ export function Inspector({
   collaboration?: CollaborationInfo | null;
 }) {
   const [tab, setTab] = useState<Tab>("context");
+
+  useEffect(() => {
+    if (nodeFocusKey > 0 && selectedNode) setTab("node");
+  }, [nodeFocusKey, selectedNode]);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "context", label: "Context" },
@@ -56,28 +77,53 @@ export function Inspector({
   ];
 
   return (
-    <aside className="flex h-full min-h-0 flex-col border-l border-[var(--border)] bg-[var(--panel)]">
+    <aside className="flex h-full min-h-0 w-full flex-col bg-[var(--panel)]">
       <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-[var(--border)] px-2 py-2">
         {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`rounded px-2 py-1 text-[11px] transition-colors duration-150 ${
-              tab === t.id
-                ? "bg-[var(--bg-2)] text-[var(--text)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text)]"
-            }`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-          </button>
+          <Tip key={t.id} tip={TAB_TIPS[t.id]}>
+            <button
+              type="button"
+              className={`rounded px-2 py-1 text-[11px] transition-colors duration-150 ${
+                tab === t.id
+                  ? "bg-[var(--bg-2)] text-[var(--text)]"
+                  : "text-[var(--text-muted)] hover:text-[var(--text)]"
+              }`}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
+            </button>
+          </Tip>
         ))}
       </div>
 
       <div className="scrollbar-thin min-h-0 flex-1 overflow-auto p-3">
         {tab === "context" ? (
           <div className="space-y-3">
-            <div className="label-caps">Dataset</div>
+            <div className="label-caps">Bound datasets</div>
+            {boundDatasets.length ? (
+              <ul className="space-y-1">
+                {boundDatasets.map((d, i) => (
+                  <li
+                    key={d.id}
+                    className="flex items-center justify-between gap-2 rounded border border-[var(--border)] bg-[var(--bg-1)] px-2 py-1.5 text-[11px]"
+                  >
+                    <span className="truncate text-[var(--text)]">
+                      <span className="font-mono text-[var(--text-muted)]">{i === 0 || d.id === primaryDatasetId ? "data" : `data_${i + 1}`}</span>
+                      {" · "}
+                      {d.name}
+                    </span>
+                    {(d.id === primaryDatasetId || i === 0) && primaryDatasetId ? (
+                      <span className="shrink-0 font-mono text-[10px] text-[var(--primary)]">主</span>
+                    ) : (
+                      <span className="shrink-0 font-mono text-[10px] text-[var(--text-muted)]">辅</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-[var(--text-muted)]">未选择 Dataset</p>
+            )}
+            <div className="label-caps">Primary dataset</div>
             {dataset ? (
               <>
                 <div className="text-sm font-medium">{dataset.name}</div>
@@ -107,17 +153,39 @@ export function Inspector({
 
         {tab === "node" ? (
           selectedNode ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-medium">{selectedNode.title}</div>
                 <span className="font-mono text-[10px] text-[var(--text-muted)]">{selectedNode.id}</span>
               </div>
               <div className="font-mono text-[10px] uppercase text-[var(--text-muted)]">
                 {selectedNode.type} · {selectedNode.kind} · {selectedNode.status}
+                {selectedNode.stepStatus ? ` · step:${selectedNode.stepStatus}` : ""}
               </div>
-              <pre className="whitespace-pre-wrap rounded-md border border-[var(--border)] bg-[var(--bg-1)] p-2 text-[11px] leading-5 text-[var(--text-muted)]">
-                {selectedNode.summary || "—"}
-              </pre>
+              {selectedNode.inputSummary ? (
+                <div>
+                  <div className="label-caps mb-1">Input</div>
+                  <pre className="whitespace-pre-wrap rounded-md border border-[var(--border)] bg-[var(--bg-1)] p-2 text-[11px] leading-5 text-[var(--text-muted)]">
+                    {selectedNode.inputSummary}
+                  </pre>
+                </div>
+              ) : null}
+              <div>
+                <div className="label-caps mb-1">Output</div>
+                <pre className="whitespace-pre-wrap rounded-md border border-[var(--border)] bg-[var(--bg-1)] p-2 text-[11px] leading-5 text-[var(--text-muted)]">
+                  {selectedNode.outputSummary || selectedNode.summary || "—"}
+                </pre>
+              </div>
+              {selectedNode.summary &&
+              selectedNode.outputSummary &&
+              selectedNode.summary !== selectedNode.outputSummary ? (
+                <div>
+                  <div className="label-caps mb-1">Summary</div>
+                  <pre className="whitespace-pre-wrap rounded-md border border-[var(--border)] bg-[var(--bg-1)] p-2 text-[11px] leading-5 text-[var(--text-muted)]">
+                    {selectedNode.summary}
+                  </pre>
+                </div>
+              ) : null}
             </div>
           ) : (
             <p className="text-xs text-[var(--text-muted)]">在 Canvas 中选中节点查看详情</p>

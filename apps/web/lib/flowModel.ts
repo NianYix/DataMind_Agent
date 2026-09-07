@@ -1,7 +1,13 @@
 export type FlowKind = "ai" | "logic" | "data" | "action" | "system";
 export type FlowNodeStatus = "pending" | "running" | "done" | "error";
 
-export type TraceItem = { type: string; summary: string };
+export type TraceItem = {
+  type: string;
+  summary: string;
+  inputSummary?: string;
+  outputSummary?: string;
+  stepStatus?: string;
+};
 
 export type FlowNodeModel = {
   id: string;
@@ -9,6 +15,9 @@ export type FlowNodeModel = {
   kind: FlowKind;
   title: string;
   summary: string;
+  inputSummary?: string;
+  outputSummary?: string;
+  stepStatus?: string;
   status: FlowNodeStatus;
   x: number;
   y: number;
@@ -94,13 +103,16 @@ export function buildGraphFromTrace(
     const isLast = idx === items.length - 1;
     let status: FlowNodeStatus = "done";
     if (opts?.running && isLast) status = "running";
-    if (/error/i.test(item.type)) status = "error";
+    if (/error/i.test(item.type) || /error/i.test(item.stepStatus || "")) status = "error";
     return {
       id: `N-${String(idx + 1).padStart(3, "0")}`,
       type: item.type,
       kind: kindOf(item.type),
       title: titleOf(item.type),
-      summary: item.summary || "",
+      summary: item.summary || item.outputSummary || item.inputSummary || "",
+      inputSummary: item.inputSummary,
+      outputSummary: item.outputSummary || item.summary,
+      stepStatus: item.stepStatus,
       status,
       x: PAD + col * (NODE_W + GAP_X),
       y: PAD + row * (NODE_H + GAP_Y),
@@ -121,6 +133,13 @@ export function buildGraphFromTrace(
   const maxX = Math.max(...nodes.map((n) => n.x)) + NODE_W + PAD;
   const maxY = Math.max(...nodes.map((n) => n.y)) + NODE_H + PAD;
   return { nodes, edges, width: maxX, height: maxY };
+}
+
+export function canvasBounds(nodes: FlowNodeModel[]): { width: number; height: number } {
+  if (!nodes.length) return { width: 480, height: 320 };
+  const maxX = Math.max(...nodes.map((n) => n.x)) + NODE_W + PAD;
+  const maxY = Math.max(...nodes.map((n) => n.y)) + NODE_H + PAD;
+  return { width: Math.max(maxX, 480), height: Math.max(maxY, 320) };
 }
 
 export const FLOW_NODE_SIZE = { w: NODE_W, h: NODE_H };
