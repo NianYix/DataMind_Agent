@@ -6,6 +6,8 @@ Agent 默认引擎：**LangChain + LangGraph**（`AGENT_ENGINE=langchain`）。�
 
 **原则**：数值结论必须来自工具真实执行，而非 LLM 直接计算。
 
+![AI数据分析平台](./AI数据分析平台.gif)
+
 ---
 
 ## 快速开始
@@ -23,7 +25,7 @@ python -m venv .venv
 .\.venv\Scripts\activate
 pip install -r requirements.txt
 copy .env.example .env
-# 编辑 .env：LLM_API_KEY=...
+# 编辑 .env：LLM_API_KEY=...（远程 API）；或 LLM_PROVIDER=ollama 使用本地模型
 # AGENT_ENGINE=langchain   # 或 legacy
 
 uvicorn server.main:app --reload --port 8000
@@ -189,9 +191,26 @@ python -m evaluation --suite sales_suite --mode mock
 
 **使用**：打开 `/settings`；若配置了 `APP_API_KEY`，写操作需带 `X-API-Key`。Multi-Agent / Critic 开关以 `.env` 为准（页内只读展示）。
 
+**Ollama 本地模型（V11）**：
+
+1. 本机安装并启动 [Ollama](https://ollama.com)，拉取模型，例如：`ollama pull qwen2.5:7b`（建议选用支持 tool calling 的模型）。
+2. 打开 `/settings`，Provider 选「Ollama 本地」，确认 Base URL（默认 `http://localhost:11434`），填写或点选模型名。
+3. 点「测试连接」确认可达后保存；之后 Workspace / Workflow 分析即走本地模型，**无需云厂商 API Key**。
+4. 也可在 `.env` 设置 `LLM_PROVIDER=ollama`、`OLLAMA_BASE_URL=...`、`LLM_MODEL=...`。
+
 ---
 
 ## 版本能力速查（配置表）
+
+### V11 Ollama 本地模型
+
+| 能力 | 说明 |
+|------|------|
+| Provider | `LLM_PROVIDER`=`api` \| `ollama`（默认 api） |
+| 本地地址 | `OLLAMA_BASE_URL`（默认 `http://localhost:11434`） |
+| 协议 | OpenAI Compatible `/v1/chat/completions` |
+| 探测 | `GET /api/llm/ollama/health`；Settings「测试连接」 |
+| UI | Settings 切换；分析页交互不变 |
 
 ### V10 Multi-Dataset
 

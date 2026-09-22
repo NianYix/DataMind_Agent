@@ -9,10 +9,18 @@ from llm.types import ChatMessage, ChatResult, TokenUsage, ToolCallRequest
 
 
 class OpenAICompatibleProvider:
-    def __init__(self, base_url: str, api_key: str, default_model: str) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        default_model: str,
+        *,
+        require_api_key: bool = True,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.default_model = default_model
+        self.require_api_key = require_api_key
 
     def chat(
         self,
@@ -25,7 +33,7 @@ class OpenAICompatibleProvider:
         tool_choice: str | dict[str, Any] | None = None,
         timeout: float = 120.0,
     ) -> ChatResult:
-        if not self.api_key:
+        if self.require_api_key and not self.api_key:
             raise RuntimeError("LLM_API_KEY is not configured. Set it in .env")
 
         payload: dict[str, Any] = {
@@ -41,7 +49,7 @@ class OpenAICompatibleProvider:
                 payload["tool_choice"] = tool_choice
 
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {self.api_key or 'ollama'}",
             "Content-Type": "application/json",
         }
         url = f"{self.base_url}/v1/chat/completions"

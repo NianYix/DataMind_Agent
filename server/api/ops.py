@@ -1,22 +1,25 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from llm.resolve import ALLOWED_PROVIDERS
 from server.core.db import get_db
 from server.core.security import require_api_key
-from server.services import audit_service, metrics_service, settings_service
+from server.services import audit_service, metrics_service, ollama_service, settings_service
 
 router = APIRouter(prefix="/api", tags=["ops"])
 
 
 class SettingsUpdate(BaseModel):
+    llm_provider: Literal["api", "ollama"] | None = None
     llm_base_url: str | None = None
     llm_api_key: str | None = None
     llm_model: str | None = None
+    ollama_base_url: str | None = None
     max_agent_steps: int | None = Field(default=None, ge=1, le=100)
     max_tool_retries: int | None = Field(default=None, ge=0, le=10)
     tool_timeout_sec: int | None = Field(default=None, ge=5, le=600)
@@ -40,7 +43,12 @@ def get_settings_public():
 @router.put("/settings")
 def put_settings(body: SettingsUpdate, db: Session = Depends(get_db), _: None = Depends(require_api_key)):
     patch = {k: v for k, v in body.model_dump().items() if v is not None}
-    result = settings_service.update_settings(patch)
+    if "llm_provider" in patch and patch["llm_provider"] not in ALLOWED_PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"Invalid llm_provider: {patch['llm_provider']}")
+    try:
+        result = settings_service.update_settings(patch)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     audit_service.record(
         db,
         event_type="settings_update",
@@ -48,6 +56,11 @@ def put_settings(body: SettingsUpdate, db: Session = Depends(get_db), _: None = 
         payload={"keys": list(patch.keys())},
     )
     return result
+
+
+@router.get("/llm/ollama/health")
+def ollama_health() -> dict[str, Any]:
+    return ollama_service.check_ollama_health()
 
 
 @router.get("/metrics")

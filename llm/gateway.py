@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from llm.providers.openai_compatible import OpenAICompatibleProvider
+from llm.resolve import require_api_key_for_chat, resolved_chat_api_key, resolved_chat_base_url
 from llm.types import ChatMessage, ChatResult
 from server.core.config import get_settings
 
@@ -11,11 +12,13 @@ class LLMGateway:
     def __init__(self) -> None:
         settings = get_settings()
         self._provider = OpenAICompatibleProvider(
-            base_url=settings.llm_base_url,
-            api_key=settings.llm_api_key,
+            base_url=resolved_chat_base_url(settings),
+            api_key=resolved_chat_api_key(settings),
             default_model=settings.llm_model,
+            require_api_key=require_api_key_for_chat(settings),
         )
         self.model = settings.llm_model
+        self.provider_name = (settings.llm_provider or "api").strip().lower()
 
     def chat(
         self,
@@ -45,3 +48,8 @@ def get_llm_gateway() -> LLMGateway:
     if _gateway is None:
         _gateway = LLMGateway()
     return _gateway
+
+
+def reset_llm_gateway() -> None:
+    global _gateway
+    _gateway = None

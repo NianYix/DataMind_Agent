@@ -22,6 +22,29 @@
 
 ## 条目
 
+### BL-004 · Ollama 本地模型分析
+
+| 字段 | 内容 |
+|------|------|
+| 提出日期 | 2026-09-21 |
+| 来源 | 用户：现为远程 API 分析；新增 Ollama 本地模型分析 |
+| 状态 | 已完成 |
+| 优先级 | P1 |
+| 关联现状 | `LLMGateway` / `ChatOpenAI` 仅 OpenAI 兼容远程 API，强制 `LLM_API_KEY` |
+
+**问题**  
+无外网或无云厂商 Key 时无法完成本地离线分析；缺少 Provider 切换与 Ollama 连通性探测。
+
+**期望**  
+- Settings 可在「远程 API」与「Ollama 本地」间切换。  
+- 本地模式不强制真实 API Key；可测连通性并列出已 pull 模型。  
+- Workspace / Workflow 分析随全局 Provider 走本地或远程。
+
+**去向**  
+[specs/v11/requirements.md](./v11/requirements.md)
+
+---
+
 ### BL-001 · Workspace 多 Dataset 同 Run 分析
 
 | 字段 | 内容 |
@@ -131,6 +154,7 @@ Logic Canvas 节点固定网格布局，用户无法自行整理重叠/遮挡或
 
 | ID | 标题 | 去向 |
 |----|------|------|
+| BL-004 | Ollama 本地模型分析 | [specs/v11](./v11/)（已完成） |
 | BL-001 | Workspace 多 Dataset 同 Run 分析 | [specs/v10](./v10/)（已完成） |
 | BL-002 | Logic Canvas 节点全文与右侧详情联动 | Workspace Inspector Node Tab + Trace 字段透传 |
 | BL-003 | Logic Canvas 节点可拖动 | `LogicCanvas` pointer drag（布局态，按 Run 重置） |
@@ -149,3 +173,6 @@ Logic Canvas 节点固定网格布局，用户无法自行整理重叠/遮挡或
 | 2026-09-07 | BL-001 立项为 V10；写入 `specs/v10/requirements.md` |
 | 2026-09-07 | V10 需求确认（D1–D7）；完成 `design.md` / `tasks.md` |
 | 2026-09-07 | V10 执行完成：Multi-Dataset 同 Run；API 0.10.0 |
+| 2026-09-21 | 入库 BL-004 Ollama 本地模型分析；立项为 V11 |
+| 2026-09-21 | V11 需求确认（按建议）；完成 `design.md` / `tasks.md` |
+| 2026-09-21 | V11 执行完成：Ollama 本地模型；API 0.11.0 |

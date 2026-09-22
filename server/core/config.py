@@ -14,9 +14,11 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 logger = logging.getLogger("datamind.config")
 
 HOT_FIELDS = {
+    "llm_provider",
     "llm_base_url",
     "llm_api_key",
     "llm_model",
+    "ollama_base_url",
     "max_agent_steps",
     "max_tool_retries",
     "tool_timeout_sec",
@@ -43,9 +45,11 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     database_url: str = f"sqlite:///{(ROOT_DIR / 'storage' / 'database' / 'datamind.db').as_posix()}"
     upload_dir: str = str(ROOT_DIR / "storage" / "uploads")
+    llm_provider: str = "api"  # api | ollama
     llm_base_url: str = "https://api.deepseek.com"
     llm_api_key: str = ""
     llm_model: str = "deepseek-chat"
+    ollama_base_url: str = "http://localhost:11434"
     max_agent_steps: int = 20
     max_tool_retries: int = 2
     tool_timeout_sec: int = 30
@@ -163,18 +167,22 @@ class Settings(BaseSettings):
 
 
 def _load_overrides() -> dict[str, Any]:
-    # Read path from env defaults without full settings (avoid recursion)
-    path = ROOT_DIR / "storage" / "settings.json"
-    raw = Path(__file__).resolve().parents[2] / ".env"
-    # Prefer SETTINGS_PATH from a lightweight parse if present
-    settings_path = path
-    if raw.exists():
-        for line in raw.read_text(encoding="utf-8").splitlines():
-            if line.startswith("SETTINGS_PATH="):
-                candidate = line.split("=", 1)[1].strip()
-                p = Path(candidate)
-                settings_path = p if p.is_absolute() else ROOT_DIR / p
-                break
+    import os
+
+    settings_path = ROOT_DIR / "storage" / "settings.json"
+    env_path = os.environ.get("SETTINGS_PATH", "").strip()
+    if env_path:
+        p = Path(env_path)
+        settings_path = p if p.is_absolute() else ROOT_DIR / p
+    else:
+        raw = ROOT_DIR / ".env"
+        if raw.exists():
+            for line in raw.read_text(encoding="utf-8").splitlines():
+                if line.startswith("SETTINGS_PATH="):
+                    candidate = line.split("=", 1)[1].strip()
+                    p = Path(candidate)
+                    settings_path = p if p.is_absolute() else ROOT_DIR / p
+                    break
     if not settings_path.exists():
         return {}
     try:

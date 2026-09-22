@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from llm import gateway as gateway_mod
+from llm.resolve import normalize_provider
 from server.core.config import HOT_FIELDS, get_settings, reload_settings
 
 
@@ -18,10 +19,12 @@ def mask_secret(value: str | None) -> str:
 def get_public_settings() -> dict[str, Any]:
     s = get_settings()
     return {
+        "llm_provider": normalize_provider(s.llm_provider),
         "llm_base_url": s.llm_base_url,
         "llm_api_key": mask_secret(s.llm_api_key),
         "llm_api_key_set": bool(s.llm_api_key),
         "llm_model": s.llm_model,
+        "ollama_base_url": s.ollama_base_url,
         "max_agent_steps": s.max_agent_steps,
         "max_tool_retries": s.max_tool_retries,
         "tool_timeout_sec": s.tool_timeout_sec,
@@ -60,11 +63,16 @@ def update_settings(patch: dict[str, Any]) -> dict[str, Any]:
             value is None or value == "" or str(value).startswith("***") or "***" in str(value)
         ):
             continue
+        if key == "llm_provider":
+            value = normalize_provider(str(value))
         current[key] = value
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
 
     reload_settings()
-    gateway_mod._gateway = None  # noqa: SLF001
+    if hasattr(gateway_mod, "reset_llm_gateway"):
+        gateway_mod.reset_llm_gateway()
+    else:
+        gateway_mod._gateway = None  # noqa: SLF001
     return get_public_settings()

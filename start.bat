@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
 
 echo ========================================
@@ -64,6 +64,67 @@ if not exist "apps\web\node_modules" (
   echo [OK] Found apps\web\node_modules
 )
 
+REM --- Ollama (ensure running WITH correct models dir) ---
+set "OLLAMA_EXE=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
+if not exist "%OLLAMA_EXE%" set "OLLAMA_EXE=%ProgramFiles%\Ollama\ollama.exe"
+if not exist "%OLLAMA_EXE%" (
+  echo [!]  Ollama not found — skip ^(remote API mode still works^)
+  goto :after_ollama
+)
+
+REM Prefer User env; fallback to E:\ollama\models when that tree exists
+if not defined OLLAMA_MODELS (
+  for /f "usebackq delims=" %%v in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('OLLAMA_MODELS','User')"`) do set "OLLAMA_MODELS=%%v"
+)
+if not defined OLLAMA_MODELS if exist "E:\ollama\models\manifests" set "OLLAMA_MODELS=E:\ollama\models"
+if defined OLLAMA_MODELS echo [OK] OLLAMA_MODELS=%OLLAMA_MODELS%
+
+REM Probe: 0=down, 1=up+models, 2=up but empty models
+set "_OLLAMA_STATE=0"
+for /f %%s in ('powershell -NoProfile -Command "try { $j=(Invoke-RestMethod -Uri \"http://127.0.0.1:11434/api/tags\" -TimeoutSec 2); if ($j.models -and $j.models.Count -gt 0) { 1 } else { 2 } } catch { 0 }"') do set "_OLLAMA_STATE=%%s"
+
+if "!_OLLAMA_STATE!"=="1" (
+  echo [OK] Ollama already running with models
+  goto :after_ollama
+)
+
+if "!_OLLAMA_STATE!"=="2" (
+  echo [!]  Ollama running but models=[] — restarting with OLLAMA_MODELS...
+  taskkill /IM ollama.exe /F >nul 2>&1
+  taskkill /IM "ollama app.exe" /F >nul 2>&1
+  timeout /t 2 /nobreak >nul
+) else (
+  echo [!]  Ollama not running, starting...
+)
+
+REM Start serve ONLY with OLLAMA_MODELS in the process env.
+REM Do NOT start "ollama app.exe" — the tray app often respawns serve WITHOUT OLLAMA_MODELS → models=[].
+if defined OLLAMA_MODELS (
+  start "Ollama" /MIN cmd /c "set OLLAMA_MODELS=%OLLAMA_MODELS%&& \"%OLLAMA_EXE%\" serve"
+) else (
+  start "Ollama" /MIN "%OLLAMA_EXE%" serve
+)
+
+set "_OLLAMA_READY=0"
+for /L %%i in (1,1,15) do (
+  if "!_OLLAMA_READY!"=="0" (
+    powershell -NoProfile -Command "try { $j=Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSec 1; if ($j.models -and $j.models.Count -gt 0) { exit 0 } else { exit 2 } } catch { exit 1 }" >nul 2>&1
+    if not errorlevel 1 (
+      set "_OLLAMA_READY=1"
+    ) else (
+      timeout /t 1 /nobreak >nul
+    )
+  )
+)
+if "!_OLLAMA_READY!"=="1" (
+  echo [OK] Ollama is ready ^(models visible^)
+) else (
+  echo [!]  Ollama API may still show empty models — check OLLAMA_MODELS /settings test
+  echo     Tip: quit Ollama tray app if it is open; use serve started by this script
+)
+
+:after_ollama
+
 echo.
 echo Starting backend  : http://localhost:8000
 echo Starting frontend : http://localhost:3000
@@ -78,7 +139,8 @@ start "" "http://localhost:3000"
 
 echo.
 echo [OK] Launched. Two windows: DataMind API / DataMind Web
-echo     Close those windows to stop services.
+echo     Ollama: serve + OLLAMA_MODELS; restart if models=[] ^(do not use empty tray serve^)
+echo     Close API/Web windows to stop DataMind. Leave the Ollama serve window if needed.
 echo.
 pause
 endlocal
